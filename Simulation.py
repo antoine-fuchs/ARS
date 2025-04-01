@@ -1,5 +1,6 @@
 import pygame
 import math
+import numpy
 
 # Initialize Pygame
 pygame.init()
@@ -51,7 +52,7 @@ while running:
                 velocity_y = 1
         elif event.type == pygame.KEYUP:
             if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                velocity_x = 0
+                velocity_x = 0 #why 0 vel?
             if event.key in (pygame.K_UP, pygame.K_DOWN):
                 velocity_y = 0
     
@@ -79,7 +80,7 @@ while running:
         collision = False
         ball_x, ball_y = new_x, new_y
 
-    # Check collision with walls
+    # Check collision with walls --> make sure ball can get closer to wall
     ball_x = max(ball_radius, min(WIDTH - ball_radius, ball_x))
     ball_y = max(ball_radius, min(HEIGHT - ball_radius, ball_y))
 
@@ -103,3 +104,8 @@ while running:
     clock.tick(30)  # Limit frame rate to 30 FPS
 
 pygame.quit()
+
+#incorporate bitmap
+#incorporate values around ball which indicate distance to object
+#collision handling for diagonal bump resolved into x and y velocities
+#incorporate motor speed values of wheel(s) --> just 1 wheel ok?

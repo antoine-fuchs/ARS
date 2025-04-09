@@ -1,111 +1,207 @@
 import pygame
 import math
-import numpy
+from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE
 
 # Initialize Pygame
 pygame.init()
 
-# Screen dimensions
-WIDTH, HEIGHT = 600, 400
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Ball Collision Game")
+pygame.display.set_caption("Differential Drive Ball Simulation")
 
-# Define colors
-green = (0, 255, 0)
-red = (255, 0, 0)
-black = (0, 0, 0)
-yellow = (255, 255, 0)
-white = (255, 255, 255)  # Color for direction arrow
+# Colors
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+YELLOW = (255, 255, 0)
 
 # Ball properties
-ball_radius = 20
-ball_x, ball_y = WIDTH // 2, HEIGHT // 2
-ball_speed = 4
+ball_radius = min(CELL_SIZE // 2 - 4, 15)  # Ball must be smaller than a cell
+ball_x, ball_y = CELL_SIZE // 2, CELL_SIZE // 2  # Start in the first cell
+ball_angle = 0  # Facing direction in radians
 
-# Obstacle properties (a circular obstacle)
-obstacle_x, obstacle_y = WIDTH // 3, HEIGHT // 3
-obstacle_radius = 40
+# Wheel speeds
+left_wheel_speed = 0
+right_wheel_speed = 0
+wheel_max_speed = 2
+wheel_base = 20  # Distance between wheels
 
-# Ball movement
-velocity_x, velocity_y = 0, 0
+# Wall thickness for collision detection
+WALL_THICKNESS = 2
 
-# Game loop control
-running = True
-clock = pygame.time.Clock()
-collision = False
-
-while running:
-    screen.fill(black)  # Clear the screen
+# Circle-Rectangle collision detection
+def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height):
+    # Calculate the closest point on the rectangle to the circle center
+    closest_x = max(rect_x, min(circle_x, rect_x + rect_width))
+    closest_y = max(rect_y, min(circle_y, rect_y + rect_height))
     
-    # Handle events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                velocity_x = -1
-            elif event.key == pygame.K_RIGHT:
-                velocity_x = 1
-            elif event.key == pygame.K_UP:
-                velocity_y = -1
-            elif event.key == pygame.K_DOWN:
-                velocity_y = 1
-        elif event.type == pygame.KEYUP:
-            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                velocity_x = 0 #why 0 vel?
-            if event.key in (pygame.K_UP, pygame.K_DOWN):
-                velocity_y = 0
+    # Calculate the distance between the closest point and the circle center
+    distance_x = circle_x - closest_x
+    distance_y = circle_y - closest_y
     
-    # Normalize speed for uniform diagonal movement
-    if velocity_x != 0 or velocity_y != 0:
-        length = math.sqrt(velocity_x**2 + velocity_y**2)
-        velocity_x = (velocity_x / length) * ball_speed
-        velocity_y = (velocity_y / length) * ball_speed
-
-    # Calculate new position
-    new_x = ball_x + velocity_x
-    new_y = ball_y + velocity_y
-
-    # Check collision with the obstacle (circle collision detection)
-    ball_center = pygame.math.Vector2(new_x, new_y)
-    obstacle_center = pygame.math.Vector2(obstacle_x, obstacle_y)
-    distance = ball_center.distance_to(obstacle_center)
+    # Calculate squared distance
+    distance_squared = distance_x * distance_x + distance_y * distance_y
     
-    if distance < ball_radius + obstacle_radius:
-        collision = True
-        direction = (ball_center - obstacle_center).normalize()
-        new_x = obstacle_center.x + direction.x * (ball_radius + obstacle_radius)
-        new_y = obstacle_center.y + direction.y * (ball_radius + obstacle_radius)
-    else:
-        collision = False
-        ball_x, ball_y = new_x, new_y
+    # If distance is less than or equal to radius, there is a collision
+    return distance_squared <= (radius * radius)
 
-    # Check collision with walls --> make sure ball can get closer to wall
-    ball_x = max(ball_radius, min(WIDTH - ball_radius, ball_x))
-    ball_y = max(ball_radius, min(HEIGHT - ball_radius, ball_y))
-
-    # Draw obstacle
-    pygame.draw.circle(screen, red, (obstacle_x, obstacle_y), obstacle_radius)
+# Check for collision with maze walls
+def check_wall_collision(ball_x, ball_y, ball_radius, grid):
+    for cell in grid:
+        x = cell.x * CELL_SIZE
+        y = cell.y * CELL_SIZE
+        
+        # Check each wall of the cell
+        if cell.walls[0]:  # Top wall
+            rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return True, 'top'
+        
+        if cell.walls[1]:  # Right wall
+            rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return True, 'right'
+        
+        if cell.walls[2]:  # Bottom wall
+            rect = pygame.Rect(x, y + CELL_SIZE - WALL_THICKNESS, CELL_SIZE, WALL_THICKNESS)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return True, 'bottom'
+        
+        if cell.walls[3]:  # Left wall
+            rect = pygame.Rect(x, y, WALL_THICKNESS, CELL_SIZE)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return True, 'left'
     
-    # Change ball color if collision occurs
-    ball_color = yellow if collision else green
-    pygame.draw.circle(screen, ball_color, (int(ball_x), int(ball_y)), ball_radius)
-    
-    # Draw direction indicator
-    if velocity_x != 0 or velocity_y != 0:
-        direction_vector = pygame.math.Vector2(velocity_x, velocity_y)
-        if direction_vector.length() != 0:
-            direction_vector = direction_vector.normalize() * 20  # Normalized length of 20 pixels
-        end_x = ball_x + direction_vector.x
-        end_y = ball_y + direction_vector.y
-        pygame.draw.line(screen, white, (ball_x, ball_y), (end_x, end_y), 3)
-    
-    pygame.display.flip()
-    clock.tick(30)  # Limit frame rate to 30 FPS
+    return False, None
 
-pygame.quit()
+def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
+    """Adjust the ball position so it exactly touches walls when in collision"""
+    collision, wall_type = check_wall_collision(ball_x, ball_y, ball_radius, grid)
+    
+    if not collision:
+        return ball_x, ball_y
+    
+    # Find the cell that has collision
+    for cell in grid:
+        x = cell.x * CELL_SIZE
+        y = cell.y * CELL_SIZE
+        
+        if cell.walls[0] and wall_type == 'top':  # Top wall
+            rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return ball_x, y + WALL_THICKNESS + ball_radius
+                
+        if cell.walls[1] and wall_type == 'right':  # Right wall
+            rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return x + CELL_SIZE - WALL_THICKNESS - ball_radius, ball_y
+                
+        if cell.walls[2] and wall_type == 'bottom':  # Bottom wall
+            rect = pygame.Rect(x, y + CELL_SIZE - WALL_THICKNESS, CELL_SIZE, WALL_THICKNESS)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return ball_x, y + CELL_SIZE - WALL_THICKNESS - ball_radius
+                
+        if cell.walls[3] and wall_type == 'left':  # Left wall
+            rect = pygame.Rect(x, y, WALL_THICKNESS, CELL_SIZE)
+            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
+                return x + WALL_THICKNESS + ball_radius, ball_y
+    
+    return ball_x, ball_y
 
-#incorporate bitmap
-#incorporate values around ball which indicate distance to object
-#collision handling for diagonal bump resolved into x and y velocities
-#incorporate motor speed values of wheel(s) --> just 1 wheel ok?
+def main():
+    # Generate maze
+    grid = generate_maze()
+    
+    clock = pygame.time.Clock()
+    running = True
+    collision = False
+    
+    # Ball variables 
+    global left_wheel_speed, right_wheel_speed, ball_x, ball_y, ball_angle
+    
+    while running:
+        screen.fill(BLACK)
+        
+        # Event handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            # Controls: W/S for left wheel, O/L for right wheel
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_w:
+                    left_wheel_speed = wheel_max_speed
+                elif event.key == pygame.K_s:
+                    left_wheel_speed = -wheel_max_speed
+                elif event.key == pygame.K_o:
+                    right_wheel_speed = wheel_max_speed
+                elif event.key == pygame.K_l:
+                    right_wheel_speed = -wheel_max_speed
+                # Additional key R to reset the ball
+                elif event.key == pygame.K_r:
+                    ball_x, ball_y = CELL_SIZE // 2, CELL_SIZE // 2
+                    ball_angle = 0
+            
+            elif event.type == pygame.KEYUP:
+                if event.key in (pygame.K_w, pygame.K_s):
+                    left_wheel_speed = 0
+                if event.key in (pygame.K_o, pygame.K_l):
+                    right_wheel_speed = 0
+        
+        # Differential drive kinematics
+        v = (right_wheel_speed + left_wheel_speed) / 2
+        omega = (right_wheel_speed - left_wheel_speed) / wheel_base
+        
+        # Update position
+        ball_angle += omega
+        dx = v * math.cos(ball_angle)
+        dy = v * math.sin(ball_angle)
+        
+        next_x = ball_x + dx
+        next_y = ball_y + dy
+        
+        # Collision detection
+        collision_x, _ = check_wall_collision(next_x, ball_y, ball_radius, grid)
+        collision_y, _ = check_wall_collision(ball_x, next_y, ball_radius, grid)
+        
+        # Update position based on collisions
+        if not collision_x:
+            ball_x = next_x
+        
+        if not collision_y:
+            ball_y = next_y
+        
+        # Adjust position for exact wall touching
+        ball_x, ball_y = adjust_ball_position(ball_x, ball_y, ball_radius, grid)
+        
+        # Check for collision after adjustment (for color change)
+        collision, _ = check_wall_collision(ball_x, ball_y, ball_radius - 0.1, grid)
+        
+        # Keep inside window
+        ball_x = max(ball_radius, min(WIDTH - ball_radius, ball_x))
+        ball_y = max(ball_radius, min(HEIGHT - ball_radius, ball_y))
+        
+        # Draw maze
+        for cell in grid:
+            cell.draw(screen)
+        
+        # Draw ball with direction arrow
+        ball_color = YELLOW if collision else GREEN
+        pygame.draw.circle(screen, ball_color, (int(ball_x), int(ball_y)), ball_radius)
+        
+        # Direction arrow
+        arrow_length = ball_radius * 1.5
+        end_x = ball_x + math.cos(ball_angle) * arrow_length
+        end_y = ball_y + math.sin(ball_angle) * arrow_length
+        pygame.draw.line(screen, WHITE, (ball_x, ball_y), (end_x, end_y), 3)
+        
+        # Display control information
+        font = pygame.font.SysFont(None, 24)
+        text = font.render("Controls: W/S (left wheel), O/L (right wheel), R (reset)", True, WHITE)
+        screen.blit(text, (10, 10))
+        
+        pygame.display.flip()
+        clock.tick(30)
+    
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()

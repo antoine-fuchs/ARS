@@ -7,7 +7,7 @@ from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE
 pygame.init()
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Differential Drive Ball Simulation")
+pygame.display.set_caption("Differential Drive Robot Simulation")
 
 # Colors
 GREEN = (0, 255, 0)
@@ -16,13 +16,13 @@ YELLOW = (255, 255, 0)
 BLUE = (0, 0, 255)
 
 # Ball properties
-ball_radius = min(CELL_SIZE // 2 - 4, 15)  # Ball must be smaller than a cell
+ball_radius = min(CELL_SIZE // 2 - 4, 15)  # Ball must be smaller than a cell --> - why the 15?
 start_x, start_y = CELL_SIZE // 2, CELL_SIZE // 2  # Start position
 ball_x, ball_y = start_x, start_y  # Current position
-ball_angle = 0  # Facing direction in radians
+ball_angle = 0  # Facing direction in radians --> now the ball can move in the non-direction of the arrow is that allowed?
 
 # Target ball properties
-target_x, target_y = 0, 0  # Will be set randomly
+target_x, target_y = 0, 0  #why set to 0, 0 initially?
 
 # Game states
 TARGET_REACHED = False
@@ -32,16 +32,17 @@ GAME_COMPLETED = False
 # Wheel speeds
 left_wheel_speed = 0
 right_wheel_speed = 0
-wheel_max_speed = 2
+wheel_max_speed = 2 #did we try whether the robot simulation still works if we change the wheel speed but NOT the wall thickness?
 wheel_base = 20  # Distance between wheels
 
 # Wall thickness for collision detection
 WALL_THICKNESS = 2
 
+
 # Circle-Rectangle collision detection
-def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height):
+def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height): #i'm assuming the circle is the robot. Shouldnt we rename it like that and have the radius be ball_radius?
     # Calculate the closest point on the rectangle to the circle center
-    closest_x = max(rect_x, min(circle_x, rect_x + rect_width))
+    closest_x = max(rect_x, min(circle_x, rect_x + rect_width)) #i dont understand this...why the min (circle_x)? and why pick the max?
     closest_y = max(rect_y, min(circle_y, rect_y + rect_height))
     
     # Calculate the distance between the closest point and the circle center
@@ -52,15 +53,18 @@ def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width
     distance_squared = distance_x * distance_x + distance_y * distance_y
     
     # If distance is less than or equal to radius, there is a collision
-    return distance_squared <= (radius * radius)
+    return distance_squared <= (radius * radius) #dont understand this... returns a boolean i guess? why the radius squared?
 
-# Circle-Circle collision detection
-def circle_circle_collision(x1, y1, r1, x2, y2, r2):
+
+def circle_circle_collision(x1, y1, r1, x2, y2, r2): #used for collision check with target
     distance_squared = (x1 - x2) ** 2 + (y1 - y2) ** 2
     return distance_squared <= ((r1 + r2) ** 2)
 
+#should we here put a fucntion that randomly puts obstacles (rectangles/circles) in the maze?
+
 # Check for collision with maze walls
 def check_wall_collision(ball_x, ball_y, ball_radius, grid):
+    """Checks whether the ball collides into any wall of the maze by using the circle_rect_collision function"""
     for cell in grid:
         x = cell.x * CELL_SIZE
         y = cell.y * CELL_SIZE
@@ -86,15 +90,16 @@ def check_wall_collision(ball_x, ball_y, ball_radius, grid):
             if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
                 return True, 'left'
     
-    return False, None
+    return False, None #should there not be 'else'?
 
 def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
-    """Adjust the ball position so it exactly touches walls when in collision"""
+    """Adjusts the ball position so it exactly touches walls when in collision"""
     collision, wall_type = check_wall_collision(ball_x, ball_y, ball_radius, grid)
     
     if not collision:
         return ball_x, ball_y
-    
+
+    #else??
     # Find the cell that has collision
     for cell in grid:
         x = cell.x * CELL_SIZE
@@ -103,7 +108,7 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
         if cell.walls[0] and wall_type == 'top':  # Top wall
             rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
             if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return ball_x, y + WALL_THICKNESS - ball_radius
+                return ball_x, y + WALL_THICKNESS - ball_radius #how come this works?
                 
         if cell.walls[1] and wall_type == 'right':  # Right wall
             rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
@@ -123,17 +128,17 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
     return ball_x, ball_y
 
 # Function to place target randomly in a valid position
-def place_target_randomly(grid, player_x, player_y, ball_radius):
-    while True:
+def place_target_randomly(grid, player_x, player_y, ball_radius): #player_x?? player_y?? what are these meant to be?
+    while True: #while what is true??
         # Choose a random cell
         random_cell = random.choice(grid)
         # Calculate center of the cell
         cell_center_x = (random_cell.x * CELL_SIZE) + (CELL_SIZE // 2)
         cell_center_y = (random_cell.y * CELL_SIZE) + (CELL_SIZE // 2)
-        
+
         # Check if it's not too close to the player's starting position
         min_distance = 5 * CELL_SIZE  # Ensure target is at least 5 cells away
-        if ((cell_center_x - player_x) ** 2 + (cell_center_y - player_y) ** 2) >= (min_distance ** 2):
+        if ((cell_center_x - player_x) ** 2 + (cell_center_y - player_y) ** 2) >= (min_distance ** 2): #so it's at least 25 away??
             # Check if it doesn't collide with walls
             if not check_wall_collision(cell_center_x, cell_center_y, ball_radius, grid)[0]:
                 return cell_center_x, cell_center_y
@@ -160,6 +165,9 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
+            #now the ball can move in the non-direction of the arrow is that allowed?
+            #can we change the robot to be moved with the arrow keys or is that too difficult cause it has 2 wheels?
+            #OR make o have the robot so up and l make the robot go down? makes more sense to me but dont know if that messes with the math
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_w:
                     left_wheel_speed = wheel_max_speed
@@ -187,7 +195,9 @@ def main():
 
         # Differential drive kinematics
         v = (right_wheel_speed + left_wheel_speed) / 2
-        omega = (right_wheel_speed - left_wheel_speed) / wheel_base
+        omega = (right_wheel_speed - left_wheel_speed) / wheel_base #rate of rotation
+        #did we check the 'check if the model makes sense' slide checks?
+        # I dont see a def for R should we not add that
 
         # Update angle
         ball_angle += omega
@@ -197,10 +207,12 @@ def main():
         dy = v * math.sin(ball_angle)
 
         # Move in small steps to get as close as possible
-        steps = int(max(abs(dx), abs(dy)) / 0.1) + 1
+        steps = int(max(abs(dx), abs(dy)) / 0.1) + 1 #where did u get this from?
         step_dx = dx / steps
         step_dy = dy / steps
 
+        #I dont see the dividing speed into vectors when there's a collision anywhere.
+        # Should we not implement this (such that the speed decreases when collision with wall)? Or is this already copntained within the kinematics?
         for _ in range(steps):
             # Try moving in X
             if not check_wall_collision(ball_x + step_dx, ball_y, ball_radius, grid)[0]:
@@ -223,12 +235,12 @@ def main():
         # Check if returned to start after reaching target
         if RETURNING_TO_START and circle_circle_collision(ball_x, ball_y, ball_radius, start_x, start_y, ball_radius):
             GAME_COMPLETED = True
-            RETURNING_TO_START = False
+            RETURNING_TO_START = False #what??
 
         # Final collision state (for coloring)
-        collision, _ = check_wall_collision(ball_x, ball_y, ball_radius, grid)
+        collision, _ = check_wall_collision(ball_x, ball_y, ball_radius, grid) #??
 
-        # Clamp inside screen
+        # Clamp inside screen --> what is a clamp???
         ball_x = max(ball_radius, min(WIDTH - ball_radius, ball_x))
         ball_y = max(ball_radius, min(HEIGHT - ball_radius, ball_y))
 
@@ -260,7 +272,8 @@ def main():
             ball_color = RED  # Red when returning to start
         else:
             ball_color = GREEN  # Green normally
-            
+
+        # Draw the robot
         pygame.draw.circle(screen, ball_color, (int(ball_x), int(ball_y)), ball_radius)
 
         # Draw direction arrow
@@ -279,7 +292,7 @@ def main():
         if GAME_COMPLETED:
             status_text = "Rescue sucessfull."
         elif RETURNING_TO_START:
-            status_text = "Aquired target, get back to the start."
+            status_text = "Acquired target. Get back to the start."
         else:
             status_text = "Get the red ball."
         
@@ -293,3 +306,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+#display motor speed numbers
+
+#create sensors --> per 30 degree angle a sensor goes out from core of robot to object, distance should be shown as number around robot
+#while distance_of_robot_to_object < threshold T
+    #do calc distance
+    #and set number to calc_distance
+#else set number to +...

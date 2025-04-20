@@ -1,7 +1,7 @@
 import pygame
 import math
 import random
-from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE
+from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE, ROWS, COLS
 
 # Initialize Pygame
 pygame.init()
@@ -37,6 +37,8 @@ wheel_base = 20  # Distance between wheels
 
 # Wall thickness for collision detection
 WALL_THICKNESS = 2
+
+
 
 # Circle-Rectangle collision detection
 def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height):
@@ -240,6 +242,12 @@ def main():
         for cell in grid:
             cell.draw(screen)
 
+        for cell in grid:
+            center_x = cell.x * CELL_SIZE + CELL_SIZE
+            center_y = cell.y * CELL_SIZE + CELL_SIZE
+            pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 10)
+
+
         # Draw trail
         for pos in trail:
             pygame.draw.circle(screen, BLUE, pos, 2)
@@ -250,6 +258,7 @@ def main():
         # Draw target ball
         if not TARGET_REACHED:
             pygame.draw.circle(screen, RED, (int(target_x), int(target_y)), ball_radius)
+
 
         # Set player ball color
         if GAME_COMPLETED:

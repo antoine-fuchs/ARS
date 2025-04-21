@@ -1,13 +1,13 @@
 import pygame
 import math
 import random
-from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE, ROWS, COLS
+from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE
 
 # Initialize Pygame
 pygame.init()
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Differential Drive Ball Simulation")
+pygame.display.set_caption("Differential Drive Robot Simulation")
 
 # Colors
 GREEN = (0, 255, 0)
@@ -16,13 +16,13 @@ YELLOW = (255, 255, 0)
 BLUE = (0, 0, 255)
 
 # Ball properties
-ball_radius = min(CELL_SIZE // 2 - 4, 15)  # Ball must be smaller than a cell
+ball_radius = min(CELL_SIZE // 2 - 4, 15)  # Ball must be smaller than a cell --> - why the 15?
 start_x, start_y = CELL_SIZE // 2, CELL_SIZE // 2  # Start position
 ball_x, ball_y = start_x, start_y  # Current position
-ball_angle = 0  # Facing direction in radians
+ball_angle = 0  # Facing direction in radians --> now the ball can move in the non-direction of the arrow is that allowed?
 
 # Target ball properties
-target_x, target_y = 0, 0  # Will be set randomly
+target_x, target_y = 0, 0  #why set to 0, 0 initially?
 
 # Game states
 TARGET_REACHED = False
@@ -32,18 +32,17 @@ GAME_COMPLETED = False
 # Wheel speeds
 left_wheel_speed = 0
 right_wheel_speed = 0
-wheel_max_speed = 2
+wheel_max_speed = 2 #did we try whether the robot simulation still works if we change the wheel speed but NOT the wall thickness?
 wheel_base = 20  # Distance between wheels
 
 # Wall thickness for collision detection
 WALL_THICKNESS = 2
 
 
-
 # Circle-Rectangle collision detection
-def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height):
+def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height): #i'm assuming the circle is the robot. Shouldnt we rename it like that and have the radius be ball_radius?
     # Calculate the closest point on the rectangle to the circle center
-    closest_x = max(rect_x, min(circle_x, rect_x + rect_width))
+    closest_x = max(rect_x, min(circle_x, rect_x + rect_width)) #i dont understand this...why the min (circle_x)? and why pick the max?
     closest_y = max(rect_y, min(circle_y, rect_y + rect_height))
     
     # Calculate the distance between the closest point and the circle center
@@ -56,8 +55,8 @@ def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width
     # If distance is less than or equal to radius, there is a collision
     return distance_squared <= (radius * radius) #dont understand this... returns a boolean i guess? why the radius squared?
 
-# Circle-Circle collision detection
-def circle_circle_collision(x1, y1, r1, x2, y2, r2):
+
+def circle_circle_collision(x1, y1, r1, x2, y2, r2): #used for collision check with target
     distance_squared = (x1 - x2) ** 2 + (y1 - y2) ** 2
     return distance_squared <= ((r1 + r2) ** 2)
 
@@ -65,6 +64,7 @@ def circle_circle_collision(x1, y1, r1, x2, y2, r2):
 
 # Check for collision with maze walls
 def check_wall_collision(ball_x, ball_y, ball_radius, grid):
+    """Checks whether the ball collides into any wall of the maze by using the circle_rect_collision function"""
     for cell in grid:
         x = cell.x * CELL_SIZE
         y = cell.y * CELL_SIZE
@@ -90,7 +90,7 @@ def check_wall_collision(ball_x, ball_y, ball_radius, grid):
             if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
                 return True, 'left'
     
-    return False, None
+    return False, None #should there not be 'else'?
 
 def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
     """Adjusts the ball position so it exactly touches walls when in collision"""
@@ -98,7 +98,8 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
     
     if not collision:
         return ball_x, ball_y
-    
+
+    #else??
     # Find the cell that has collision
     for cell in grid:
         x = cell.x * CELL_SIZE
@@ -107,7 +108,7 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
         if cell.walls[0] and wall_type == 'top':  # Top wall
             rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
             if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return ball_x, y + WALL_THICKNESS - ball_radius
+                return ball_x, y + WALL_THICKNESS - ball_radius #how come this works?
                 
         if cell.walls[1] and wall_type == 'right':  # Right wall
             rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
@@ -127,14 +128,14 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
     return ball_x, ball_y
 
 # Function to place target randomly in a valid position
-def place_target_randomly(grid, player_x, player_y, ball_radius):
-    while True:
+def place_target_randomly(grid, player_x, player_y, ball_radius): #player_x?? player_y?? what are these meant to be?
+    while True: #while what is true??
         # Choose a random cell
         random_cell = random.choice(grid)
         # Calculate center of the cell
         cell_center_x = (random_cell.x * CELL_SIZE) + (CELL_SIZE // 2)
         cell_center_y = (random_cell.y * CELL_SIZE) + (CELL_SIZE // 2)
-        
+
         # Check if it's not too close to the player's starting position
         min_distance = 5 * CELL_SIZE  # Ensure target is at least 5 cells away
         if ((cell_center_x - player_x) ** 2 + (cell_center_y - player_y) ** 2) >= (min_distance ** 2): #so it's at least 25 away??
@@ -234,7 +235,7 @@ def main():
         # Check if returned to start after reaching target
         if RETURNING_TO_START and circle_circle_collision(ball_x, ball_y, ball_radius, start_x, start_y, ball_radius):
             GAME_COMPLETED = True
-            RETURNING_TO_START = False
+            RETURNING_TO_START = False #what??
 
         # Final collision state (for coloring)
         collision, _ = check_wall_collision(ball_x, ball_y, ball_radius, grid) #??
@@ -251,12 +252,6 @@ def main():
         for cell in grid:
             cell.draw(screen)
 
-        for cell in grid:
-            center_x = cell.x * CELL_SIZE + CELL_SIZE
-            center_y = cell.y * CELL_SIZE + CELL_SIZE
-            pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 10)
-
-
         # Draw trail
         for pos in trail:
             pygame.draw.circle(screen, BLUE, pos, 2)
@@ -267,7 +262,6 @@ def main():
         # Draw target ball
         if not TARGET_REACHED:
             pygame.draw.circle(screen, RED, (int(target_x), int(target_y)), ball_radius)
-
 
         # Set player ball color
         if GAME_COMPLETED:

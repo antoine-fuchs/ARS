@@ -9,7 +9,7 @@ class Kalman_filter:
     def __init__(self, process_noise, measurement_noise):
         self.state = np.array([[ball_x], [ball_y], [ball_angle]])
         self.covariance =  np.eye(3) * 1.0 #start initializing covariance with identity matrix, can be changed to sigma**2
-        self.R = process_noise #can describve this too
+        self.R = process_noise #can describe this too
         self.Q = measurement_noise #can describe this too according to the slides
 
     # Kinematics

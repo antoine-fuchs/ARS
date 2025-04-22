@@ -91,39 +91,36 @@ def check_wall_collision(ball_x, ball_y, ball_radius, grid):
                 return True, 'left'
     
     return False, None
-
 def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
-    """Adjusts the ball position so it exactly touches walls when in collision"""
     collision, wall_type = check_wall_collision(ball_x, ball_y, ball_radius, grid)
     
     if not collision:
         return ball_x, ball_y
-    
-    # Find the cell that has collision
+
     for cell in grid:
         x = cell.x * CELL_SIZE
         y = cell.y * CELL_SIZE
-        
+
         if cell.walls[0] and wall_type == 'top':  # Top wall
             rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return ball_x, y + WALL_THICKNESS - ball_radius
-                
+            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
+                return ball_x, rect.bottom + ball_radius + 1
+
         if cell.walls[1] and wall_type == 'right':  # Right wall
             rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return x + CELL_SIZE + WALL_THICKNESS - ball_radius, ball_y
-                
+            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
+                return rect.left - ball_radius - 1, ball_y
+
         if cell.walls[2] and wall_type == 'bottom':  # Bottom wall
             rect = pygame.Rect(x, y + CELL_SIZE - WALL_THICKNESS, CELL_SIZE, WALL_THICKNESS)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return ball_x, y - CELL_SIZE - WALL_THICKNESS - ball_radius
-                
+            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
+                return ball_x, rect.top - ball_radius - 1
+
         if cell.walls[3] and wall_type == 'left':  # Left wall
             rect = pygame.Rect(x, y, WALL_THICKNESS, CELL_SIZE)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return x + WALL_THICKNESS - ball_radius, ball_y
-    
+            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
+                return rect.right + ball_radius + 1, ball_y
+
     return ball_x, ball_y
 
 # Function that calculates the distance between the center of the ball and its surrounding features
@@ -168,7 +165,7 @@ def main():
     # Generate the maze
     grid = generate_maze()
 
-    font = pygame.font.SysFont(None, 24)  # oder eine andere Größe wie 30
+    font = pygame.font.SysFont(None, 18)  # oder eine andere Größe wie 30
 
 
     clock = pygame.time.Clock()
@@ -281,6 +278,12 @@ def main():
             center_y = cell.y * CELL_SIZE + CELL_SIZE
             pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 10)
 
+            # Optional: ID als Text anzeigen
+            id_text = font.render(str(cell.cell_id), True, WHITE)
+            text_rect = id_text.get_rect(center=(center_x, center_y))
+            screen.blit(id_text, text_rect)
+
+
 
         # Draw trail
         for pos in trail:
@@ -294,9 +297,7 @@ def main():
             pygame.draw.circle(screen, RED, (int(target_x), int(target_y)), ball_radius)
 
                 # Draw text with wheel speeds on the ball
-        speed_text = font.render(f"L:{left_wheel_speed:.1f} R:{right_wheel_speed:.1f}", True, WHITE)
-        text_rect = speed_text.get_rect(center=(ball_x, ball_y))
-        screen.blit(speed_text, text_rect)
+
 
 
 
@@ -356,6 +357,10 @@ def main():
         
         status_render = font.render(status_text, True, WHITE)
         screen.blit(status_render, (10, 40))
+        font = pygame.font.SysFont(None, 12)
+        speed_text = font.render(f"L:{left_wheel_speed:.0f} R:{right_wheel_speed:.0f}", True, BLUE)
+        text_rect = speed_text.get_rect(center=(ball_x, ball_y))
+        screen.blit(speed_text, text_rect)
 
         pygame.display.flip()
         clock.tick(30)

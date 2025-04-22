@@ -12,11 +12,12 @@ BLACK = (0, 0, 0)
 
 # Cell class
 class Cell:
-    def __init__(self, x, y):
+    def __init__(self, x, y, cell_id):
         self.x = x
         self.y = y
         self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
         self.visited = False
+        self.cell_id = cell_id
     
     def draw(self, screen):
         x = self.x * CELL_SIZE
@@ -68,13 +69,18 @@ def remove_walls(a, b):
 
 # Generate maze using DFS algorithm
 def generate_maze():
-    # Create grid
-    grid = [Cell(x, y) for y in range(ROWS) for x in range(COLS)]
-    
+    # Create grid with IDs
+    cell_id = 0
+    grid = []
+    for y in range(ROWS):
+        for x in range(COLS):
+            grid.append(Cell(x, y, cell_id))
+            cell_id += 1
+
     current = grid[0]
     stack = []
     current.visited = True
-    
+
     while True:
         next_cell = current.check_neighbors(grid)
         if next_cell:
@@ -86,8 +92,9 @@ def generate_maze():
             current = stack.pop()
         else:
             break
-    
+
     return grid
+
 
 # If this script is run directly, show the maze
 if __name__ == "__main__":
@@ -107,6 +114,21 @@ if __name__ == "__main__":
         
         for cell in grid:
             cell.draw(screen)
+
+                # Kreispositionen an den vier Ecken
+        corner_positions = [
+            (0, 0),
+            (COLS - 1, 0),
+            (COLS - 1, ROWS - 1),
+            (0, ROWS - 1)
+        ]
+
+        # In Pixel-Koordinaten umwandeln und Kreise zeichnen
+        for cell in grid:
+            center_x = cell.x * CELL_SIZE + CELL_SIZE
+            center_y = cell.y * CELL_SIZE + CELL_SIZE
+            pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 10)
+
         
         pygame.display.flip()
     

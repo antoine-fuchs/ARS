@@ -32,7 +32,7 @@ GAME_COMPLETED = False
 # Wheel speeds
 left_wheel_speed = 0
 right_wheel_speed = 0
-wheel_max_speed = 2
+wheel_max_speed = 5
 wheel_base = 20  # Distance between wheels
 
 # Wall thickness for collision detection
@@ -168,6 +168,9 @@ def main():
     # Generate the maze
     grid = generate_maze()
 
+    font = pygame.font.SysFont(None, 24)  # oder eine andere Größe wie 30
+
+
     clock = pygame.time.Clock()
     running = True
 
@@ -290,6 +293,12 @@ def main():
         if not TARGET_REACHED:
             pygame.draw.circle(screen, RED, (int(target_x), int(target_y)), ball_radius)
 
+                # Draw text with wheel speeds on the ball
+        speed_text = font.render(f"L:{left_wheel_speed:.1f} R:{right_wheel_speed:.1f}", True, WHITE)
+        text_rect = speed_text.get_rect(center=(ball_x, ball_y))
+        screen.blit(speed_text, text_rect)
+
+
 
         # Set player ball color
         if GAME_COMPLETED:
@@ -355,12 +364,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-#display motor speed numbers
-
-#create sensors --> per 30 degree angle a sensor goes out from core of robot to object, distance should be shown as number around robot
-#while distance_of_robot_to_object < threshold T
-    #do calc distance
-    #and set number to calc_distance
-#else set number to +...

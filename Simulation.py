@@ -126,6 +126,28 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
     
     return ball_x, ball_y
 
+# Function that calculates the distance between the center of the ball and its surrounding features
+def cast_sensor(ball_x, ball_y, ball_radius, angle, grid, max_sensor_length = 2*ball_radius, step=1):
+    angle_rad = math.radians(angle)
+    for dist in range(0, 2*ball_radius, step):
+        probe_x = ball_x + dist * math.cos(angle_rad)
+        probe_y = ball_y + dist * math.sin(angle_rad)
+
+        # Check if the probe point collides with any wall
+        collision, _ = check_wall_collision(probe_x, probe_y, ball_radius, grid)
+        if collision:
+            return dist
+    return max_sensor_length #why does this not work with 'else'?
+
+def calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid, sensor_angles):
+    distances = []
+    for angle in sensor_angles:
+        # Cast a ray at this angle and check for possible collisions
+        distance = cast_sensor(ball_x, ball_y, ball_radius, angle, grid)
+        distances.append(distance)
+    return distances
+
+
 # Function to place target randomly in a valid position
 def place_target_randomly(grid, player_x, player_y, ball_radius):
     while True:
@@ -287,6 +309,27 @@ def main():
         end_x = ball_x + math.cos(ball_angle) * arrow_length
         end_y = ball_y + math.sin(ball_angle) * arrow_length
         pygame.draw.line(screen, WHITE, (ball_x, ball_y), (end_x, end_y), 3)
+
+        # Draw the sensors
+        num_sensors = 12
+        sensor_angles = [i * 30 for i in range(num_sensors)]  # a sensor at every 30 degrees
+        sensor_lengths = calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid, sensor_angles)
+
+        font = pygame.font.SysFont(None, 18)
+
+        for i, angle in enumerate(sensor_angles):
+            angle_in_rad = math.radians(angle)
+            sensor_start_x = ball_x + ball_radius * math.cos(
+                angle_in_rad)  # got this math from GPT but dont undertsand where the sine and cosine come from
+            sensor_start_y = ball_y + ball_radius * math.sin(angle_in_rad)
+            sensor_tip_x = ball_x + (ball_radius + int(sensor_lengths[i])) * math.cos(angle_in_rad)
+            sensor_tip_y = ball_y + (ball_radius + int(sensor_lengths[i])) * math.sin(angle_in_rad)
+
+            pygame.draw.line(screen, RED, (sensor_start_x, sensor_start_y), (sensor_tip_x, sensor_tip_y), 2)
+            # got this below from GPT so might be better to rewrite?
+            distance_info = font.render(f"{int(sensor_lengths[i])}", True, RED)
+            text_rect = distance_info.get_rect(center=(sensor_tip_x, sensor_tip_y))  # what is this?
+            screen.blit(distance_info, text_rect)
 
         # Controls info
         font = pygame.font.SysFont(None, 24)

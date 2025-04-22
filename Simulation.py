@@ -2,6 +2,7 @@ import pygame
 import math
 import random
 from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE, ROWS, COLS
+from Kalman_filter import *
 
 # Initialize Pygame
 pygame.init()
@@ -61,7 +62,7 @@ def circle_circle_collision(x1, y1, r1, x2, y2, r2):
     distance_squared = (x1 - x2) ** 2 + (y1 - y2) ** 2
     return distance_squared <= ((r1 + r2) ** 2)
 
-#should we here put a fucntion that randomly puts obstacles (rectangles/circles) in the maze?
+#should we here put a function that randomly puts obstacles (rectangles/circles) in the maze?
 
 # Check for collision with maze walls
 def check_wall_collision(ball_x, ball_y, ball_radius, grid):
@@ -123,23 +124,24 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
 
     return ball_x, ball_y
 
+
 # Function that calculates the distance between the center of the ball and its surrounding features
 def cast_sensor(ball_x, ball_y, ball_radius, angle, grid, max_sensor_length = 2*ball_radius, step=1):
     angle_rad = math.radians(angle)
     for dist in range(0, 2*ball_radius, step):
-        probe_x = ball_x + dist * math.cos(angle_rad)
+        probe_x = ball_x + dist * math.cos(angle_rad) #got this math from GPT but dont understand where the sine and cosine come from
         probe_y = ball_y + dist * math.sin(angle_rad)
 
         # Check if the probe point collides with any wall
         collision, _ = check_wall_collision(probe_x, probe_y, ball_radius, grid)
         if collision:
             return dist
-    return max_sensor_length #why does this not work with 'else'?
+    return max_sensor_length #why does this not work with 'else'?, should add distance threshold?
 
 def calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid, sensor_angles):
     distances = []
     for angle in sensor_angles:
-        # Cast a ray at this angle and check for possible collisions
+        # Cast a sensor at this angle and check for possible collisions
         distance = cast_sensor(ball_x, ball_y, ball_radius, angle, grid)
         distances.append(distance)
     return distances
@@ -276,8 +278,7 @@ def main():
         for cell in grid:
             center_x = cell.x * CELL_SIZE + CELL_SIZE
             center_y = cell.y * CELL_SIZE + CELL_SIZE
-            pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 10)
-
+            point_features = pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 5)
             # Optional: ID als Text anzeigen
             id_text = font.render(str(cell.cell_id), True, WHITE)
             text_rect = id_text.get_rect(center=(center_x, center_y))
@@ -296,7 +297,7 @@ def main():
         if not TARGET_REACHED:
             pygame.draw.circle(screen, RED, (int(target_x), int(target_y)), ball_radius)
 
-                # Draw text with wheel speeds on the ball
+        # Draw text with wheel speeds on the ball
 
 
 
@@ -327,10 +328,10 @@ def main():
 
         font = pygame.font.SysFont(None, 18)
 
+        # Calculate the start and end points of each sensor
         for i, angle in enumerate(sensor_angles):
             angle_in_rad = math.radians(angle)
-            sensor_start_x = ball_x + ball_radius * math.cos(
-                angle_in_rad)  # got this math from GPT but dont undertsand where the sine and cosine come from
+            sensor_start_x = ball_x + ball_radius * math.cos(angle_in_rad)
             sensor_start_y = ball_y + ball_radius * math.sin(angle_in_rad)
             sensor_tip_x = ball_x + (ball_radius + int(sensor_lengths[i])) * math.cos(angle_in_rad)
             sensor_tip_y = ball_y + (ball_radius + int(sensor_lengths[i])) * math.sin(angle_in_rad)
@@ -340,6 +341,11 @@ def main():
             distance_info = font.render(f"{int(sensor_lengths[i])}", True, RED)
             text_rect = distance_info.get_rect(center=(sensor_tip_x, sensor_tip_y))  # what is this?
             screen.blit(distance_info, text_rect)
+
+        # Activate Kalman filter
+        kf = KalmanFilter(initial_state=0, initial_covariance=1, process_noise=0.1, measurement_noise=1)
+        kf.predict(u)
+        kf.correct(sensor_lengths)
 
         # Controls info
         font = pygame.font.SysFont(None, 24)

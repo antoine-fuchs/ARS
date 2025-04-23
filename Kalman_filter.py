@@ -18,8 +18,8 @@ class Kalman_filter:
         v = (right_wheel_speed + left_wheel_speed) / 2
         omega = (right_wheel_speed - left_wheel_speed) / wheel_base #rate of rotation
         ball_angle += omega #ball angle == theta
-        #dx = v * math.cos(ball_angle) * dt
-        #dy = v * math.sin(ball_angle) * dt
+        dx = v * math.cos(ball_angle) * dt
+        dy = v * math.sin(ball_angle) * dt
         ball_angle_change = omega * dt
 
         # Initializing A, B & u
@@ -30,7 +30,7 @@ class Kalman_filter:
         # Prediction of new state after action u & covariance
         self.state = self.state * A + B * u
         self.covariance += self.R
-        #draw predicted path/localization
+        #draw predicted path/localization --> in main?
 
     def get_observed_features(self):
         observed_features = []
@@ -40,26 +40,23 @@ class Kalman_filter:
             dy = z[1] - self.state[1]
 
             true_range = np.sqrt(dx ** 2 + dy ** 2)
-            if true_range > 2 * ball_radius:  #why >?
+            if true_range > max_sensor_length:  #or rather: if intersection of sensor with feature
                 continue
             angle = np.arctan2(dy, dx)
-            bearing = angle - self.state[2]
+            bearing = angle - self.state[2] #phi, according to lecture slides
             observed_data = {
                 "position": np.array(z),
                 "measurement": np.array([true_range, bearing])}
-
-            #if intersection with sensor...
             observed_features.append(observed_data)
             return observed_features
-            #draw line from robot to landmark by changing the sensor's color
+            #draw line from robot to landmark by changing the sensor's color --> in main?
 
     def correct(self, observed_features):
         x, y, ball_angle = self.state #predicted state estimation
 
         for feature in observed_features:
             fx, fy = feature["position"]
-
-            measured_range, measured_bearing = feature["measurement"]
+            measured_distance, measured_bearing = feature["measurement"]
 
         # Expected feature measurements based on predicted state
         dx = fx - x

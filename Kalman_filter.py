@@ -22,7 +22,7 @@ class Kalman_filter:
     def __init__(self):
         self.state = np.array([[ball_x], [ball_y], [ball_angle]])
         self.covariance =  np.eye(3) * 1.0 #start initializing covariance with identity matrix, can be changed to sigma**2
-        self.R = np.eye(3) * 0.5 #process_noise #can describe this too
+        self.R = np.eye(3) * 0.5 #process_noise
         self.Q = np.eye(3) * 0.5 #measurement_noise
 
     def predict(self, u):
@@ -36,7 +36,7 @@ class Kalman_filter:
     def correct(self, z):
         #need to define z by using the landmark measurements
         C = np.eye(3) * 1.0
-        K = self.covariance / (self.covariance + self.R) #Kalman gain
+        K = self.covariance / (self.covariance + self.R) #Kalman gain, dont remember how i got to this
         self.state = self.state + K * (z - C * self.state)
         self.covariance = (1 - K * C) * self.covariance
         #draw the corrected path

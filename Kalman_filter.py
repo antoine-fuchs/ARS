@@ -2,6 +2,9 @@ import pygame
 import math
 import numpy as np
 import random
+
+from tornado.queues import Queue
+
 from maze import *
 from Simulation import *
 
@@ -42,24 +45,34 @@ class Kalman_filter:
             del(self.estimated_position[0])
         return estimated_position_trail
 
+
     def get_observed_features(self):
         observed_features = []
-        #z = Cell(x, y, cell_id)
-        for z in grid: #should actually also be able to use features not part of the grid
+        #input should be: z = Cell(x, y, cell_id)
+        for z in self.grid: #should actually also be able to use features not part of the grid
             dx = z[0] - self.state[0]
             dy = z[1] - self.state[1]
 
-            true_range = np.sqrt(dx ** 2 + dy ** 2)
-            if true_range > max_sensor_length:  #or rather: if intersection of sensor with feature
+            true_distance = np.sqrt(dx ** 2 + dy ** 2) #dont fully understand why we need this or what it does
+            if true_distance < max_sensor_length: #daniel has it the other way around but this doesnt make sense to me
                 continue
+
+            # Compute actual angle & bearing vs measured data (with noise Q added)
             angle = np.arctan2(dy, dx)
             bearing = angle - self.state[2] #phi, according to lecture slides
+            measured_distance = true_distance + self.Q
+            measured_bearing = bearing + self.Q
+
             observed_data = {
                 "position": np.array(z),
-                "measurement": np.array([true_range, bearing])}
+                "measurement": np.array([measured_distance, measured_bearing])}
             observed_features.append(observed_data)
             return observed_features
-            #draw line from robot to landmark by changing the sensor's color --> in main?
+            # Draw line from robot to landmark
+            collision, _ = check_wall_collision(probe_x, probe_y, ball_radius, grid)
+            if collision:
+                pygame.draw.line(screen, ORANGE, (sensor_start_x, sensor_start_y), (z[0], z[1]), 2)
+
 
     def correct(self, observed_features):
         x, y, ball_angle = self.state #predicted state estimation

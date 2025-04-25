@@ -17,7 +17,7 @@ class Kalman_filter:
         #do we need a step counter?
 
 
-    def predict(self, dt):
+    def predict(self, dt = 0.1):
         # Kinematics --> repurposed from simulation
         v = (right_wheel_speed + left_wheel_speed) / 2
         omega = (right_wheel_speed - left_wheel_speed) / wheel_base #rate of rotation
@@ -31,10 +31,16 @@ class Kalman_filter:
         A = np.eye(3) * 1.0
         B = np.array([[dt * np.cos(ball_angle), 0], [dt * np.sin(ball_angle), 0], [0, dt]])
 
-        # Prediction of new state after action u & covariance
+        # Prediction of new state (after action u) & covariance
         self.state = self.state * A + B * u #or should I save this in a new predicted_state vector?
-        self.covariance += self.R #same Q here...
-        #draw predicted path/localization --> in main?
+        self.covariance += self.R #same question here...
+
+        # Drawing the estimated position trail
+        self.estimated_position.append(self,state[:2].copy()) #why copy?
+        estimated_position_trail = pygame.draw.circle(screen, BLUE, pos, 2)
+        if len(self.estimated_position) > self.max_estimated_position_length:
+            del(self.estimated_position[0])
+        return estimated_position_trail
 
     def get_observed_features(self):
         observed_features = []

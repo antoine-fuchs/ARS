@@ -6,10 +6,11 @@ import random
 from tornado.queues import Queue
 
 from maze import *
-from Simulation import *
+#from Simulation import *
 
-class Kalman_filter:
+class KalmanFilter:
     def __init__(self):
+        from Simulation import ball_x, ball_y,ball_angle
         self.state = np.array([[ball_x], [ball_y], [ball_angle]])
         self.covariance =  np.eye(3) * 0.5 #start initializing covariance with sigma**2 --> should try out different values (local vs global initialization)
         self.R = np.eye(3) * 0.5 #process_noise

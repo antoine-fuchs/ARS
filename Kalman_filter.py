@@ -5,16 +5,20 @@ import random
 from maze import *
 from Simulation import *
 
-
 class Kalman_filter:
     def __init__(self):
         self.state = np.array([[ball_x], [ball_y], [ball_angle]])
-        self.covariance =  np.eye(3) * 1.0 #start initializing covariance with identity matrix, can be changed to sigma**2
+        self.covariance =  np.eye(3) * 0.5 #start initializing covariance with sigma**2 --> should try out different values (local vs global initialization)
         self.R = np.eye(3) * 0.5 #process_noise
         self.Q = np.eye(3) * 0.5 #measurement_noise
+        self.grid = grid #dont know if i need this but maybe for the trail?
+        self.estimated_position = []
+        self.max_estimated_position_length = 500
+        #do we need a step counter?
+
 
     def predict(self, dt):
-        # Kinematics
+        # Kinematics --> repurposed from simulation
         v = (right_wheel_speed + left_wheel_speed) / 2
         omega = (right_wheel_speed - left_wheel_speed) / wheel_base #rate of rotation
         ball_angle += omega #ball angle == theta
@@ -28,8 +32,8 @@ class Kalman_filter:
         B = np.array([[dt * np.cos(ball_angle), 0], [dt * np.sin(ball_angle), 0], [0, dt]])
 
         # Prediction of new state after action u & covariance
-        self.state = self.state * A + B * u
-        self.covariance += self.R
+        self.state = self.state * A + B * u #or should I save this in a new predicted_state vector?
+        self.covariance += self.R #same Q here...
         #draw predicted path/localization --> in main?
 
     def get_observed_features(self):

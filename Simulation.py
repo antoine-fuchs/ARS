@@ -342,12 +342,14 @@ def main():
             text_rect = distance_info.get_rect(center=(sensor_tip_x, sensor_tip_y))  # what is this?
             screen.blit(distance_info, text_rect)
 
+
         # Activate Kalman filter --> this doesnt work
         kf = Kalman_filter
         kf.__init__(self)
         kf.predict(self, dt=0.1)
         kf.get_observed_features(self)
         kf.correct(self, get_observed_features.observed_features)
+
 
         # Controls info
         font = pygame.font.SysFont(None, 24)

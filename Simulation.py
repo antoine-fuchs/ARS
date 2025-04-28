@@ -2,7 +2,7 @@ import pygame
 import math
 import random
 from maze import generate_maze, Cell, CELL_SIZE, WIDTH, HEIGHT, BLACK, WHITE, ROWS, COLS
-from kalman_filter import KalmanFilter
+from Kalman_filter import KalmanFilter
 
 # Initialize Pygame
 pygame.init()
@@ -345,8 +345,7 @@ def main():
 
         # Activate Kalman filter --> this doesnt work
         kf = KalmanFilter()
-        kf.__init__(self)
-        kf.predict(self, dt=0.1)
+        kf.predict(dt=0.1)
         kf.get_observed_features(self)
         kf.correct(self, get_observed_features.observed_features)
     

@@ -6,7 +6,7 @@ import random
 from tornado.queues import Queue
 
 from maze import *
-#from Simulation import *
+
 
 class KalmanFilter:
     def __init__(self):
@@ -15,7 +15,7 @@ class KalmanFilter:
         self.covariance =  np.eye(3) * 0.5 #start initializing covariance with sigma**2 --> should try out different values (local vs global initialization)
         self.R = np.eye(3) * 0.5 #process_noise
         self.Q = np.eye(3) * 0.5 #measurement_noise
-        self.grid = grid #dont know if i need this but maybe for the trail?
+        #self.grid = grid #dont know if i need this but maybe for the trail?
         self.estimated_position = []
         self.max_estimated_position_length = 500
         #do we need a step counter?
@@ -23,6 +23,7 @@ class KalmanFilter:
 
     def predict(self, dt = 0.1):
         # Kinematics --> repurposed from simulation
+        from Simulation import right_wheel_speed, left_wheel_speed, wheel_base, ball_angle
         v = (right_wheel_speed + left_wheel_speed) / 2
         omega = (right_wheel_speed - left_wheel_speed) / wheel_base #rate of rotation
         ball_angle += omega #ball angle == theta
@@ -54,8 +55,8 @@ class KalmanFilter:
             dx = z[0] - self.state[0]
             dy = z[1] - self.state[1]
 
-            true_distance = np.sqrt(dx ** 2 + dy ** 2) #dont fully understand why we need this or what it does
-            if true_distance < max_sensor_length: #daniel has it the other way around but this doesnt make sense to me
+            true_distance = np.sqrt(dx ** 2 + dy ** 2)
+            if true_distance > max_sensor_length:
                 continue
 
             # Compute actual angle & bearing vs measured data (with noise Q added)

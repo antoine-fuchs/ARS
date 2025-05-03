@@ -9,72 +9,75 @@ CELL_SIZE = WIDTH // COLS
 # Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
 
 # Cell class
 class Cell:
-    def __init__(self, x, y, cell_id):
-        self.x = x
-        self.y = y
+    def __init__(self, i, j, cell_id):
+        self.i = i  # column index
+        self.j = j  # row index
+        self.x = i * CELL_SIZE  # pixel x-position
+        self.y = j * CELL_SIZE  # pixel y-position
         self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
         self.visited = False
         self.cell_id = cell_id
+        self.marker = random.random() < 0.2  # 20% chance to have a marker
     
     def draw(self, screen):
-        x = self.x * CELL_SIZE
-        y = self.y * CELL_SIZE
-        
         if self.walls[0]:  # Top wall
-            pygame.draw.line(screen, WHITE, (x, y), (x + CELL_SIZE, y), 2)
+            pygame.draw.line(screen, WHITE, (self.x, self.y), (self.x + CELL_SIZE, self.y), 2)
         if self.walls[1]:  # Right wall
-            pygame.draw.line(screen, WHITE, (x + CELL_SIZE, y), (x + CELL_SIZE, y + CELL_SIZE), 2)
+            pygame.draw.line(screen, WHITE, (self.x + CELL_SIZE, self.y), (self.x + CELL_SIZE, self.y + CELL_SIZE), 2)
         if self.walls[2]:  # Bottom wall
-            pygame.draw.line(screen, WHITE, (x + CELL_SIZE, y + CELL_SIZE), (x, y + CELL_SIZE), 2)
+            pygame.draw.line(screen, WHITE, (self.x + CELL_SIZE, self.y + CELL_SIZE), (self.x, self.y + CELL_SIZE), 2)
         if self.walls[3]:  # Left wall
-            pygame.draw.line(screen, WHITE, (x, y + CELL_SIZE), (x, y), 2)
-    
+            pygame.draw.line(screen, WHITE, (self.x, self.y + CELL_SIZE), (self.x, self.y), 2)
+
+
+
     def check_neighbors(self, grid):
         neighbors = []
-        
-        def index(x, y):
-            if 0 <= x < COLS and 0 <= y < ROWS:
-                return x + y * COLS
+
+        def index(i, j):
+            if 0 <= i < COLS and 0 <= j < ROWS:
+                return i + j * COLS
             return None
-        
+
         # Directions: top, right, bottom, left
         directions = [(0, -1), (1, 0), (0, 1), (-1, 0)]
-        for i, (dx, dy) in enumerate(directions):
-            nx, ny = self.x + dx, self.y + dy
-            idx = index(nx, ny)
+        for dx, dy in directions:
+            ni, nj = self.i + dx, self.j + dy
+            idx = index(ni, nj)
             if idx is not None and not grid[idx].visited:
                 neighbors.append(grid[idx])
-        
+
         return random.choice(neighbors) if neighbors else None
 
 # Remove walls between two cells
 def remove_walls(a, b):
-    dx = a.x - b.x
-    dy = a.y - b.y
+    dx = a.i - b.i
+    dy = a.j - b.j
     if dx == 1:
-        a.walls[3] = False
-        b.walls[1] = False
+        a.walls[3] = False  # left
+        b.walls[1] = False  # right
     elif dx == -1:
         a.walls[1] = False
         b.walls[3] = False
     if dy == 1:
-        a.walls[0] = False
-        b.walls[2] = False
+        a.walls[0] = False  # top
+        b.walls[2] = False  # bottom
     elif dy == -1:
         a.walls[2] = False
         b.walls[0] = False
 
 # Generate maze using DFS algorithm
 def generate_maze():
-    # Create grid with IDs
+    # Create grid with cell IDs
     cell_id = 0
     grid = []
-    for y in range(ROWS):
-        for x in range(COLS):
-            grid.append(Cell(x, y, cell_id))
+    for j in range(ROWS):
+        for i in range(COLS):
+            grid.append(Cell(i, j, cell_id))
             cell_id += 1
 
     current = grid[0]
@@ -95,41 +98,25 @@ def generate_maze():
 
     return grid
 
-
-# If this script is run directly, show the maze
+# Main loop
 if __name__ == "__main__":
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Maze Generator")
-    
+
     grid = generate_maze()
-    
+
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        
+
         screen.fill(BLACK)
-        
+
         for cell in grid:
             cell.draw(screen)
 
-                # Kreispositionen an den vier Ecken
-        corner_positions = [
-            (0, 0),
-            (COLS - 1, 0),
-            (COLS - 1, ROWS - 1),
-            (0, ROWS - 1)
-        ]
-
-        # In Pixel-Koordinaten umwandeln und Kreise zeichnen
-        for cell in grid:
-            center_x = cell.x * CELL_SIZE + CELL_SIZE
-            center_y = cell.y * CELL_SIZE + CELL_SIZE
-            pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 10)
-
-        
         pygame.display.flip()
-    
+
     pygame.quit()

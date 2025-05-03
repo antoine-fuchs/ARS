@@ -67,8 +67,8 @@ def circle_circle_collision(x1, y1, r1, x2, y2, r2):
 # Check for collision with maze walls
 def check_wall_collision(ball_x, ball_y, ball_radius, grid):
     for cell in grid:
-        x = cell.x * CELL_SIZE
-        y = cell.y * CELL_SIZE
+        x = cell.x
+        y = cell.y
         
         # Check each wall of the cell
         if cell.walls[0]:  # Top wall
@@ -99,8 +99,8 @@ def adjust_ball_position(ball_x, ball_y, ball_radius, grid):
         return ball_x, ball_y
 
     for cell in grid:
-        x = cell.x * CELL_SIZE
-        y = cell.y * CELL_SIZE
+        x = cell.x
+        y = cell.y
 
         if cell.walls[0] and wall_type == 'top':  # Top wall
             rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
@@ -153,8 +153,8 @@ def place_target_randomly(grid, player_x, player_y, ball_radius):
         # Choose a random cell
         random_cell = random.choice(grid)
         # Calculate center of the cell
-        cell_center_x = (random_cell.x * CELL_SIZE) + (CELL_SIZE // 2)
-        cell_center_y = (random_cell.y * CELL_SIZE) + (CELL_SIZE // 2)
+        cell_center_x = (random_cell.x) + (CELL_SIZE // 2)
+        cell_center_y = (random_cell.y) + (CELL_SIZE // 2)
         
         # Check if it's not too close to the player's starting position
         min_distance = 5 * CELL_SIZE  # Ensure target is at least 5 cells away
@@ -276,19 +276,23 @@ def main():
             cell.draw(screen)
 
         for cell in grid:
-            center_x = cell.x * CELL_SIZE + CELL_SIZE
-            center_y = cell.y * CELL_SIZE + CELL_SIZE
-            point_features = pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 5)
+            center_x = cell.x
+            center_y = cell.y
+            if cell.marker:
+                point_features = pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 5)
             # Optional: ID als Text anzeigen
-            id_text = font.render(str(cell.cell_id), True, WHITE)
-            text_rect = id_text.get_rect(center=(center_x, center_y))
-            screen.blit(id_text, text_rect)
+                id_text = font.render(str(cell.cell_id), True, WHITE)
+                text_rect = id_text.get_rect(center=(center_x, center_y))
+                screen.blit(id_text, text_rect)
 
 
 
         # Draw trail
-        for pos in trail:
-            pygame.draw.circle(screen, BLUE, pos, 2)
+        #for pos in trail:
+        if len(trail) >2:
+            pygame.draw.lines(screen, BLUE,False, trail, 2)
+
+
 
         # Draw start point
         pygame.draw.circle(screen, WHITE, (int(start_x), int(start_y)), ball_radius // 2)
@@ -344,10 +348,10 @@ def main():
 
 
         # Activate Kalman filter --> this doesnt work
-        kf = KalmanFilter()
+        kf = KalmanFilter(initial_state=[ball_x, ball_y, ball_angle], grid=grid, screen=screen)
         kf.predict(dt=0.1)
-        kf.get_observed_features(self)
-        kf.correct(self, get_observed_features.observed_features)
+        features = kf.get_observed_features()
+        kf.correct(features)
     
 
         # Controls info

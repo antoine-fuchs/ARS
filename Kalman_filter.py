@@ -1,8 +1,8 @@
 import pygame
 import math
 import numpy as np
+from Maze import *  # ensure this provides needed classes like `check_wall_collision`
 
-from maze import *  # ensure this provides needed classes like `check_wall_collision`
 estimated_position = []
 
 def gaussian_prob(error, sigma_sq):

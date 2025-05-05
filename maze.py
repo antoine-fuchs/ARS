@@ -1,15 +1,6 @@
 import pygame
 import random
-
-# Screen dimensions and grid size
-WIDTH, HEIGHT = 800, 800
-COLS, ROWS = 10, 10
-CELL_SIZE = WIDTH // COLS
-
-# Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-GREEN = (0, 255, 0)
+from Config import *
 
 # Cell class
 class Cell:

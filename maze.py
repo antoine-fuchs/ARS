@@ -21,7 +21,7 @@ class Cell:
         self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
         self.visited = False
         self.cell_id = cell_id
-        self.marker = random.random() < 0.2  # 20% chance to have a marker
+        self.marker = random.random() < 0.5  # 20% chance to have a marker
     
     def draw(self, screen):
         if self.walls[0]:  # Top wall

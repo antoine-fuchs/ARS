@@ -7,6 +7,8 @@ from Kalman_filter import KalmanFilter
 # Initialize Pygame
 pygame.init()
 
+
+initialized = False
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Differential Drive Ball Simulation")
 
@@ -141,7 +143,7 @@ def cast_sensor(ball_x, ball_y, ball_radius, angle, grid, max_sensor_length = 2*
 def calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid, sensor_angles):
     distances = []
     for angle in sensor_angles:
-        # Cast a sensor at this angle and check for possible collisions
+        # Cast a sensor at this angle and check for possible collisionswwwwwwww
         distance = cast_sensor(ball_x, ball_y, ball_radius, angle, grid)
         distances.append(distance)
     return distances
@@ -163,9 +165,15 @@ def place_target_randomly(grid, player_x, player_y, ball_radius):
             if not check_wall_collision(cell_center_x, cell_center_y, ball_radius, grid)[0]:
                 return cell_center_x, cell_center_y
 
+
+grid = generate_maze()
+kf = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+initialized = False
+
+
 def main():
     # Generate the maze
-    grid = generate_maze()
+    #grid = generate_maze()
 
     font = pygame.font.SysFont(None, 18)  # oder eine andere Größe wie 30
 
@@ -173,7 +181,7 @@ def main():
     clock = pygame.time.Clock()
     running = True
 
-    global left_wheel_speed, right_wheel_speed, ball_x, ball_y, ball_angle
+    global left_wheel_speed, right_wheel_speed, ball_x, ball_y, ball_angle, initialized
     global TARGET_REACHED, RETURNING_TO_START, GAME_COMPLETED
 
     # Place the target ball
@@ -277,7 +285,7 @@ def main():
 
         for cell in grid:
             center_x = cell.x
-            center_y = cell.y
+            center_y = cell.y 
             if cell.marker:
                 point_features = pygame.draw.circle(screen, (0, 255, 0), (center_x, center_y), 5)
             # Optional: ID als Text anzeigen
@@ -348,12 +356,24 @@ def main():
 
 
         # Activate Kalman filter --> this doesnt work
-        kf = KalmanFilter(initial_state=[ball_x, ball_y, ball_angle], grid=grid, screen=screen)
-        kf.predict(dt=0.1)
-        features = kf.get_observed_features()
+        #wwwwwwwkf = KalmanFilter(initial_state=[ball_x, ball_y, ball_angle], grid=grid, screen=screen)
+        kf.predict(ball_x,ball_y,ball_angle,dt=0.1)
+        features = kf.get_observed_features(ball_x,ball_y,ball_angle)
         kf.correct(features)
-    
+        #initialized = False
+        # Falls noch nicht initialisiert, versuche es mit Landmark-Triangulation
+        # if not initialized:
+        #     features = kf.get_observed_features()
+        #     success = kf.initialize_pose_from_landmarks(features)
+        #     if success:
+        #         initialized = True
+        # else:
+        #     # Normale Kalman-Filter-Schleife
+        #     kf.predict(dt=0.1)
+        #     features = kf.get_observed_features()
+        #     kf.correct(features)
 
+    
         # Controls info
         font = pygame.font.SysFont(None, 24)
         controls_text = font.render("Controls: W/S (left), O/L (right), R (reset)", True, WHITE)

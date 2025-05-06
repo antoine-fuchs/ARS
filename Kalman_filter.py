@@ -12,10 +12,11 @@ def gaussian_prob(error, sigma_sq):
 class KalmanFilter:
     def __init__(self, initial_state, grid, screen, estimated_state = [[None],[None],[None]]):
         self.state = np.array(initial_state).reshape((3, 1))  # [[x], [y], [theta]]
-        self.covariance = np.eye(3) * 0.5  # initial uncertainty
-        self.R = np.eye(3) * 3  # process noise
-        self.Q = np.eye(2) * 3  # measurement noise (2D: distance, bearing)
+        self.covariance = np.eye(3) * 5  # initial uncertainty
+        self.R = np.eye(3) * 5  # process noise
+        self.Q = np.eye(2) * 1  # measurement noise (2D: distance, bearing)
         #self.estimated_state 
+        
 
         #self.estimated_position = []
         self.max_estimated_position_length = 500
@@ -36,7 +37,6 @@ class KalmanFilter:
         """
         # 1. Sammle aktuelle Landmarken‐Messungen
         observed = self.get_observed_features(ball_x,ball_y,ball_angle)
-        print(observed)
         
         # 2. Versuche, Position (x,y) per Triangulation zu schätzen
         pos_est = self.triangulate_position_from_landmarks(observed)
@@ -49,15 +49,15 @@ class KalmanFilter:
             f0 = observed[0]
             lm = self.landmark_map[f0["id"]]
             theta_est = self.estimate_theta_from_landmark(
-                robot_pos=(self.state[0,0], self.state[1,0]),
-                landmark_pos=lm,
-                measured_bearing=f0["measurement"][1]
+                robot_xy=(self.state[0,0], self.state[1,0]),
+                landmark_xy=lm,
+                phi_meas=f0["measurement"][1]
             )
             self.state[2, 0] = theta_est
 
             # 4. Kovarianz ggf. zurücksetzen oder vergrößern,
             #    da du gerade komplett neu initialisierst:
-            self.covariance = np.eye(3) * 500  
+            self.covariance = np.eye(3) * 5  
 
         else:
             # Wenn zu wenige Landmarken, behalte letzte Schätzung
@@ -71,51 +71,48 @@ class KalmanFilter:
             estimated_position.pop(0)
         for pos in estimated_position:
             pygame.draw.circle(self.screen, RED, pos, 2)
-        print(estimated_pos)
 
 
-    def get_observed_features(self,ball_x,ball_y,ball_angle, max_sensor_length=100, fov=np.pi):
-        """
-        Returns a list of observed features in the form:
-        {
-            'id': marker_id,
-            'measurement': np.array([distance, bearing]),
-            'true_position': (x, y)  ← optional, for debugging only
-        }
-        """
+
+    def get_observed_features(self, ball_x, ball_y, ball_angle,
+                              max_sensor_length=100, fov=np.pi):
         observed_features = []
-        x, y, theta = ball_x,ball_y,ball_angle
+        x, y, theta = ball_x, ball_y, ball_angle
+
+        sigma_r = math.sqrt(self.Q[0, 0])
+        sigma_phi = math.sqrt(self.Q[1, 1])
 
         for cell in self.grid:
             if not getattr(cell, "marker", False):
                 continue
 
-            # Use cell center as landmark position
-            landmark_x = cell.x
-            landmark_y = cell.y
-
-            dx = landmark_x - x
-            dy = landmark_y - y
-            distance = np.sqrt(dx ** 2 + dy ** 2)
-            if distance > max_sensor_length:
+            # Landmark-Position
+            lx, ly = cell.x, cell.y
+            dx, dy = lx - x, ly - y
+            dist_true = math.hypot(dx, dy)
+            if dist_true > max_sensor_length:
                 continue
 
-            # Simulated noisy measurement
-            measured_distance = distance + np.random.normal(0, self.Q[0, 0])
-            measured_bearing = ball_angle + np.random.normal(0, self.Q[1, 1])
+            # *** KORREKT : richtiger Messwert mit Rauschen ***
+            # true bearing relativ zur Robot-Richtung
+            phi_true = (math.atan2(dy, dx) - theta + math.pi) % (2*math.pi) - math.pi
 
-            # Visualization (optional)
-            pygame.draw.line(self.screen, (0, 255, 0), (int(x), int(y)), (int(landmark_x), int(landmark_y)), 1)
-            pygame.draw.circle(self.screen, (255, 165, 0), (int(landmark_x), int(landmark_y)), 4)
+            measured_distance = dist_true + np.random.normal(0, sigma_r)
+            measured_bearing  = phi_true   + np.random.normal(0, sigma_phi)
 
-            # Append observation
+            # Visualisierung
+            pygame.draw.line(self.screen, (0,255,0),
+                             (int(x),int(y)), (int(lx),int(ly)), 1)
+            pygame.draw.circle(self.screen, (255,165,0),
+                               (int(lx),int(ly)), 4)
+
             observed_features.append({
                 "id": cell.cell_id,
                 "measurement": np.array([measured_distance, measured_bearing]),
-                "true_position": (landmark_x, landmark_y)  # ← for debugging/visualization only
+                "true_position": (lx, ly)
             })
-
         return observed_features
+
 
 
     def compute_landmark_likelihood(self, feature, landmark_pos, robot_pose, landmark_id, sigma_r2, sigma_phi2, sigma_s2=1):
@@ -189,89 +186,125 @@ class KalmanFilter:
 
         return self.state, self.covariance
 
-    def triangulate_position_from_landmarks(self, observed_features, max_distance=100):
-        """
-        Estimate position (x, y) using triangulation from ≥2 landmark observations within range.
-        If exactly 2 are available, also return theta via bearing.
-        """
-        # Filter only those within max_distance
-        valid = []
-        for f in observed_features:
-            landmark_id = f["id"]
-            if landmark_id not in self.landmark_map:
-                continue
-            r = f["measurement"][0]
-            if r <= max_distance:
-                valid.append(f)
+    def intersect_two_circles(self, p1, r1, p2, r2, eps=1e-9):
+        x1, y1 = p1
+        x2, y2 = p2
+        dx, dy = x2 - x1, y2 - y1
+        d = math.hypot(dx, dy)
+        # keine Lösung bei zu großer/kleiner Entfernung oder identischem Zentrum
+        if d == 0 or d > r1 + r2 or d < abs(r1 - r2):
+            return None
+        # Abstand von p1 zur Mittellinie
+        a = (r1*r1 - r2*r2 + d*d) / (2*d)
+        # Höhe des Dreiecks, robust clamped
+        h2 = r1*r1 - a*a
+        if h2 < -eps:
+            return None
+        h = math.sqrt(max(h2, 0.0))
+        # Mittelpunkts-Koordinaten
+        xm = x1 + a * dx / d
+        ym = y1 + a * dy / d
+        # Verschiebung entlang der Normalen
+        rx = -dy * (h / d)
+        ry = dx * (h / d)
+        # Tangentialfall: ein Schnittpunkt
+        if h < eps:
+            return [(xm, ym)]
+        # zwei Schnittpunkte
+        return [(xm + rx, ym + ry), (xm - rx, ym - ry)]
 
-        if len(valid) < 2:
-            return None  # not enough
+    def angle_diff(self, a, b):
+        # normalisiere auf [-pi, pi]
+        return (a - b + math.pi) % (2*math.pi) - math.pi
 
-        # If exactly 2 → triangulate and estimate theta
-        if len(valid) == 2:
-            f1, f2 = valid
-            id1, id2 = f1["id"], f2["id"]
-            x1, y1 = self.landmark_map[id1]
-            x2, y2 = self.landmark_map[id2]
-            r1, r2 = f1["measurement"][0], f2["measurement"][0]
+    def estimate_theta_from_landmark(self, robot_xy, landmark_xy, phi_meas):
+        dx = landmark_xy[0] - robot_xy[0]
+        dy = landmark_xy[1] - robot_xy[1]
+        theta = math.atan2(dy, dx) - phi_meas
+        return (theta + math.pi) % (2*math.pi) - math.pi
 
-            # Linearize the equations
-            A = np.array([[2 * (x2 - x1), 2 * (y2 - y1)]])
-            b = np.array([[r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2]])
-
-            try:
-                pos_est, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
-                x, y = pos_est.flatten()
-
-                # Schätze theta aus erster Landmarke
-                lm = self.landmark_map[id1]
-                measured_phi = f1["measurement"][1]
-                theta = self.estimate_theta_from_landmark((x, y), lm, measured_phi)
-
-                return np.array([x, y, theta])  # Full pose
-            except:
-                return None
-
-        # If ≥3 valid landmarks → normal least squares triangulation
-        A = []
-        b = []
-        for i in range(len(valid) - 1):
-            f1 = valid[i]
-            f2 = valid[i + 1]
-            id1, id2 = f1["id"], f2["id"]
-            x1, y1 = self.landmark_map[id1]
-            x2, y2 = self.landmark_map[id2]
-            r1, r2 = f1["measurement"][0], f2["measurement"][0]
-
-            A.append([2 * (x2 - x1), 2 * (y2 - y1)])
-            b.append([r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2])
-
-        A = np.array(A).reshape(-1, 2)
-        b = np.array(b).reshape(-1, 1)
-
-        try:
-            pos_est, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
-            return pos_est.flatten()  # Nur x, y
-        except:
+    def triangulate_position_from_two_landmarks(
+        self, lm1, r1, phi1, lm2, r2, phi2,
+        prev_xy=None, epsilon=1e-6
+    ):
+        # 1. beide Schnittpunkte berechnen
+        ints = self.intersect_two_circles(lm1, r1, lm2, r2)
+        if not ints:
             return None
 
-    
-    def estimate_theta_from_landmark(self, robot_pos, landmark_pos, measured_bearing):
-        """
-        robot_pos: np.array([x, y])
-        landmark_pos: np.array([mx, my])
-        measured_phi: gemessener Winkel (relativ)
-        """
-        dx = landmark_pos[0] - robot_pos[0]
-        dy = landmark_pos[1] - robot_pos[1]
-        global_angle = math.atan2(dy, dx)
+        # 2. optional: Schnittpunkte nach Nähe zu letzter Pose sortieren
+        if prev_xy is not None:
+            ints = sorted(ints,
+                          key=lambda p: (p[0]-prev_xy[0])**2 + (p[1]-prev_xy[1])**2)
 
-        theta_estimated = global_angle - measured_bearing
+        best = None
+        best_err = float('inf')
 
-        # Normalize to [-π, π]
-        theta_estimated = (theta_estimated + np.pi) % (2 * np.pi) - np.pi
+        # 3. Standard-Loop über Kandidaten (der erste ist dann der nächste am prev_xy)
+        for (x, y) in ints:
+            # a) globale Blickwinkel
+            pred1 = math.atan2(lm1[1] - y, lm1[0] - x)
+            pred2 = math.atan2(lm2[1] - y, lm2[0] - x)
+            # b) Schätzung von θ als Kreis-Mittelwert von pred−φ
+            d1 = self.angle_diff(pred1, phi1)
+            d2 = self.angle_diff(pred2, phi2)
+            theta_i = math.atan2(math.sin(d1)+math.sin(d2),
+                                 math.cos(d1)+math.cos(d2))
+            # c) Winkel-Residuen
+            err1 = abs(self.angle_diff(pred1 - theta_i, phi1))
+            err2 = abs(self.angle_diff(pred2 - theta_i, phi2))
+            err = err1 + err2
 
-        return theta_estimated
+            if err < best_err - epsilon:
+                best_err = err
+                best = (x, y, theta_i)
+
+        if best is None:
+            return None
+
+        x_sel, y_sel, theta_sel = best
+        theta_sel = (theta_sel + math.pi) % (2*math.pi) - math.pi
+        print(f"  Using lm1={lm1} with φ₁={phi1:.3f}, lm2={lm2} with φ₂={phi2:.3f}")
+
+        return np.array([x_sel, y_sel, theta_sel])
+
+
+    def triangulate_position_from_landmarks(self, observed, max_distance=100):
+        valid = []
+        for f in observed:
+            lm_id = f["id"]
+            if lm_id in self.landmark_map:
+                r, phi = f["measurement"]
+                if r <= max_distance:
+                    valid.append((self.landmark_map[lm_id], r, phi))
+
+        # Zu wenige Landmarken → kein Ergebnis
+        if len(valid) < 2:
+            return None
+
+        # Genau zwei Landmarken: nimm Schnittpunkt, der näher an letzter Pose liegt
+        if len(valid) == 2:
+            (lm1, r1, phi1), (lm2, r2, phi2) = valid
+            prev_xy = (self.state[0, 0], self.state[1, 0])
+            return self.triangulate_position_from_two_landmarks(
+                lm1, r1, phi1,
+                lm2, r2, phi2,
+                prev_xy=prev_xy
+            )
+
+        # Mehr als zwei Landmarken: Least-Squares-Lösung
+        (x0, y0), r0, _ = valid[0]
+        A, b = [], []
+        for (xi, yi), ri, _ in valid[1:]:
+            A.append([2*(xi - x0), 2*(yi - y0)])
+            b.append([r0*r0 - ri*ri - x0*x0 + xi*xi - y0*y0 + yi*yi])
+        A = np.array(A)
+        b = np.array(b).reshape(-1, 1)
+        try:
+            (x, y), *_ = np.linalg.lstsq(A, b, rcond=None)
+            return np.array([x.item(), y.item()])
+        except np.linalg.LinAlgError:
+            return None
 
 
     def initialize_pose_from_landmarks(self, observed_features):

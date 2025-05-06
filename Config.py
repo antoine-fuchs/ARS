@@ -11,6 +11,7 @@ BLACK = (0,0,0)
 WIDTH, HEIGHT = 800, 800
 COLS, ROWS = 10, 10
 CELL_SIZE = WIDTH // COLS
+
 # Ball properties
 ball_radius = min(CELL_SIZE // 2 - 4, 15)  # Ball must be smaller than a cell
 start_x, start_y = CELL_SIZE // 2, CELL_SIZE // 2  # Start position

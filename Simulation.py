@@ -3,9 +3,12 @@ from Maze import *
 from Kalman_filter import *
 from Utils import *
 from Config import *
+from Map import *
 
 grid = generate_maze()
 kf = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+ogm = OccupancyGridMap(rows=ROWS, cols=COLS,grid = grid)
+
 
 def main():
     global ball_x, ball_y, ball_angle
@@ -51,6 +54,11 @@ def main():
         kf.correct(features)
 
         draw_ui_texts(screen, state, ball_x, ball_y)
+
+        # nach draw_sensor_lines():
+        ogm.update(ball_x, ball_y, sensor_angles, sensor_lengths,ball_radius)
+        ogm.draw(screen)
+
 
         pygame.display.flip()
         clock.tick(30)

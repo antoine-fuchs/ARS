@@ -56,3 +56,21 @@ best_fitnesses = []
 for gen in range(generations):
     fitnesses = [evaluate_fitness(g) for g in population]
     best_fitnesses.append(max(fitnesses))
+
+#this might be better
+for gen in range(GENERATIONS):
+    fitnesses = [evaluate_fitness(ind) for ind in population]
+    new_population = []
+
+    for _ in range(POP_SIZE):
+        parent1 = tournament_selection(population, fitnesses)
+        parent2 = tournament_selection(population, fitnesses)
+        child = crossover(parent1, parent2)
+        child = mutate(child)
+        new_population.append(child)
+
+    population = new_population
+
+    best_fitness = max(fitnesses)
+    best_genome = population[np.argmax(fitnesses)]
+    print(f"Generation {gen}: Best Fitness = {best_fitness:.4f}, Genome = {best_genome}")

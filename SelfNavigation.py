@@ -53,7 +53,7 @@ elitism = 0.2 #preserves the top individuals by copying them into the next gen
 
 #generate a random genome with random weights
 def random_genome():
-    return np.random.uniform(-1, 1, genome_size)
+    return np.random.uniform(-1, 1, genome_size) #or shoudl we do 0 to 1
 
 #mutate & cross-over to mix up genome
 def mutate(genome):

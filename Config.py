@@ -29,7 +29,7 @@ GAME_COMPLETED = False
 # Wheel speeds
 left_wheel_speed = 0
 right_wheel_speed = 0
-wheel_max_speed = 10
+wheel_max_speed = 3
 wheel_base = 20  # Distance between wheels
 
 # Wall thickness for collision detection
@@ -48,3 +48,7 @@ font_maze_id = pygame.font.SysFont(None, 12)
 font_sensors = pygame.font.SysFont(None, 12)
 font_hints = pygame.font.SysFont(None, 24)
 font_speed = pygame.font.SysFont(None, 12)
+
+
+BASE_SIMULATION_STEPS      = 10   
+SIMULATION_STEP_INCREMENT  = 10    

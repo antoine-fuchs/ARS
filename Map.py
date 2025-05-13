@@ -30,6 +30,8 @@ class OccupancyGridMap:
         self.persist_surf.fill((0, 0, 0, 0))
         # List of walls detected in last update
         self.current_walls = []
+        # Keep track of already discovered walls for exploration reward
+        self.discovered_walls = set()
 
     def world_to_grid(self, x, y):
         j = min(self.cols - 1, max(0, int(x // self.cell_size)))
@@ -37,6 +39,13 @@ class OccupancyGridMap:
         return i, j
 
     def update(self, robot_x, robot_y, sensor_angles, sensor_distances, ball_radius):
+        """
+        Update the log-odds map with current sensor readings,
+        draw new walls, and compute exploration reward.
+
+        Returns:
+            exploration_reward (int): number of newly discovered walls
+        """
         self.current_walls.clear()
         for angle, dist in zip(sensor_angles, sensor_distances):
             # skip no-detection (>= max_range)
@@ -48,7 +57,7 @@ class OccupancyGridMap:
             ey = robot_y + dist * math.sin(rad)
             # check which wall was hit
             collision, wall_type = check_wall_collision(
-                ex, ey, ball_radius, self.grid, self.cell_size, WALL_THICKNESS
+                ex, ey, ball_radius, self.grid
             )
             if not collision:
                 continue
@@ -72,8 +81,14 @@ class OccupancyGridMap:
         # clamp log-odds arrays
         np.clip(self.log_h, -5.0, 5.0, out=self.log_h)
         np.clip(self.log_v, -5.0, 5.0, out=self.log_v)
+        # compute exploration reward
+        new_walls = set(self.current_walls) - self.discovered_walls
+        exploration_reward = len(new_walls)
+        # update discovered walls
+        self.discovered_walls.update(new_walls)
         # redraw persistent map after update
         self._draw_persistent()
+        return exploration_reward
 
     def _draw_persistent(self):
         self.persist_surf.fill((0, 0, 0, 0))

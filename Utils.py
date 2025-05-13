@@ -27,87 +27,76 @@ def circle_circle_collision(x1, y1, r1, x2, y2, r2):
 
 #should we here put a function that randomly puts obstacles (rectangles/circles) in the maze?
 
-# Check for collision with maze walls
-def check_wall_collision(ball_x, ball_y, ball_radius, grid, CELL_SIZE, WALL_THICKNESS):
+# In deiner Utils- oder Collision-Datei
+
+def check_wall_collision(circle_x, circle_y, r, grid):
+    sides = ['top','right','bottom','left']
     for cell in grid:
-        x = cell.x
-        y = cell.y
-        
-        # Check each wall of the cell
-        if cell.walls[0]:  # Top wall
-            rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return True, 'top'
-        
-        if cell.walls[1]:  # Right wall
-            rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return True, 'right'
-        
-        if cell.walls[2]:  # Bottom wall
-            rect = pygame.Rect(x, y + CELL_SIZE - WALL_THICKNESS, CELL_SIZE, WALL_THICKNESS)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return True, 'bottom'
-        
-        if cell.walls[3]:  # Left wall
-            rect = pygame.Rect(x, y, WALL_THICKNESS, CELL_SIZE)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, rect.x, rect.y, rect.width, rect.height):
-                return True, 'left'
-    
-    return False, None
-def adjust_ball_position(ball_x, ball_y, ball_radius, grid,CELL_SIZE,WALL_THICKNESS):
-    collision, wall_type = check_wall_collision(ball_x, ball_y, ball_radius, grid)
-    
-    if not collision:
+        x, y = cell.x, cell.y
+        walls = [
+            pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS),                    # top
+            pygame.Rect(x+CELL_SIZE-WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE),  # right
+            pygame.Rect(x, y+CELL_SIZE-WALL_THICKNESS, CELL_SIZE, WALL_THICKNESS),  # bottom
+            pygame.Rect(x, y, WALL_THICKNESS, CELL_SIZE)                    # left
+        ]
+        for idx, rect in enumerate(walls):
+            if not cell.walls[idx]:
+                continue
+            # nächster Punkt auf rect
+            cx = max(rect.x, min(circle_x, rect.x + rect.width))
+            cy = max(rect.y, min(circle_y, rect.y + rect.height))
+            dx, dy = circle_x - cx, circle_y - cy
+            if dx*dx + dy*dy <= r*r:
+                return rect, sides[idx]
+    return None, None
+
+
+def adjust_ball_position(ball_x, ball_y, r, rect, side):
+    if rect is None:
         return ball_x, ball_y
-
-    for cell in grid:
-        x = cell.x
-        y = cell.y
-
-        if cell.walls[0] and wall_type == 'top':  # Top wall
-            rect = pygame.Rect(x, y, CELL_SIZE, WALL_THICKNESS)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
-                return ball_x, rect.bottom + ball_radius + 1
-
-        if cell.walls[1] and wall_type == 'right':  # Right wall
-            rect = pygame.Rect(x + CELL_SIZE - WALL_THICKNESS, y, WALL_THICKNESS, CELL_SIZE)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
-                return rect.left - ball_radius - 1, ball_y
-
-        if cell.walls[2] and wall_type == 'bottom':  # Bottom wall
-            rect = pygame.Rect(x, y + CELL_SIZE - WALL_THICKNESS, CELL_SIZE, WALL_THICKNESS)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
-                return ball_x, rect.top - ball_radius - 1
-
-        if cell.walls[3] and wall_type == 'left':  # Left wall
-            rect = pygame.Rect(x, y, WALL_THICKNESS, CELL_SIZE)
-            if circle_rect_collision(ball_x, ball_y, ball_radius, *rect):
-                return rect.right + ball_radius + 1, ball_y
-
+    if   side == 'top':    return ball_x, rect.bottom + r
+    elif side == 'bottom': return ball_x, rect.top    - r
+    elif side == 'left':   return rect.right + r, ball_y
+    elif side == 'right':  return rect.left  - r, ball_y
     return ball_x, ball_y
 
 
-# Function that calculates the distance between the center of the ball and its surrounding features
-def cast_sensor(ball_x, ball_y, ball_radius, angle, grid, CELL_SIZE, WALL_THICKNESS, step=1):
-    max_sensor_length = 2*ball_radius
-    angle_rad = math.radians(angle)
-    for dist in range(0, 2*ball_radius, step):
-        probe_x = ball_x + dist * math.cos(angle_rad) #got this math from GPT but dont understand where the sine and cosine come from
+def cast_sensor(ball_x, ball_y, ball_radius, angle_deg, grid,
+                max_range, step=1):
+    """
+    Schießt einen Sensor-Strahl ab Kugeloberfläche in Richtung `angle_deg`.
+    Gibt die Entfernung von der Kugeloberfläche bis zur Wand zurück.
+    - angle_deg: Winkel in Grad (0° = rechts, 90° = unten, etc.)
+    - max_range: maximale Reichweite des Sensors (ab Kugelmittelpunkt!)
+    - step: Schrittweite in Pixeln
+    """
+    angle_rad = math.radians(angle_deg)
+    # Wir beginnen bei dist = ball_radius
+    for dist in range(int(ball_radius), int(max_range), step):
+        probe_x = ball_x + dist * math.cos(angle_rad)
         probe_y = ball_y + dist * math.sin(angle_rad)
+        # r=0, weil wir nur Punkt prüfen
+        collision_rect, _ = check_wall_collision(probe_x, probe_y, 0, grid)
+        if collision_rect:
+            # Zieh den Radius ab, damit 0 = Berührung
+            return dist - ball_radius
 
-        # Check if the probe point collides with any wall
-        collision, _ = check_wall_collision(probe_x, probe_y, ball_radius, grid, CELL_SIZE, WALL_THICKNESS)
-        if collision:
-            return dist
-    return max_sensor_length #why does this not work with 'else'?, should add distance threshold?
+    # Keine Wand im Sichtbereich
+    return max_range - ball_radius
 
-def calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid, sensor_angles, CELL_SIZE, WALL_THICKNESS):
+
+def calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid,
+                                      sensor_angles, max_range, step=1):
+    """
+    Liest für jede Richtung in sensor_angles die Distanz zur nächstliegenden Wand.
+    - sensor_angles: Liste von Winkeln in Grad
+    - max_range: maximale Entfernung vom Kugelmittelpunkt
+    """
     distances = []
     for angle in sensor_angles:
-        # Cast a sensor at this angle and check for possible collisionswwwwwwww
-        distance = cast_sensor(ball_x, ball_y, ball_radius, angle, grid, CELL_SIZE, WALL_THICKNESS)
-        distances.append(distance)
+        d = cast_sensor(ball_x, ball_y, ball_radius, angle,
+                        grid, max_range, step)
+        distances.append(d)
     return distances
 
 
@@ -124,7 +113,7 @@ def place_target_randomly(grid, player_x, player_y, ball_radius, CELL_SIZE, WALL
         min_distance = 5 * CELL_SIZE  # Ensure target is at least 5 cells away
         if ((cell_center_x - player_x) ** 2 + (cell_center_y - player_y) ** 2) >= (min_distance ** 2): #so it's at least 25 away??
             # Check if it doesn't collide with walls
-            if not check_wall_collision(cell_center_x, cell_center_y, ball_radius, grid,CELL_SIZE, WALL_THICKNESS)[0]:
+            if not check_wall_collision(cell_center_x, cell_center_y, ball_radius, grid)[0]:
                 return cell_center_x, cell_center_y
             
 def handle_keyboard_input(event, state):
@@ -146,27 +135,40 @@ def handle_keyboard_input(event, state):
         if event.key in (pygame.K_o, pygame.K_l):
             state['right_speed'] = 0
 
-def update_robot_position(ball_x, ball_y, ball_angle, v, omega, radius, grid, CELL_SIZE, WALL_THICKNESS):
+def update_robot_position(ball_x, ball_y, ball_angle, v, omega,
+                          radius, grid, CELL_SIZE, WALL_THICKNESS):
+    # Gesamtbewegung
     dx = v * math.cos(ball_angle)
     dy = v * math.sin(ball_angle)
 
-    steps = int(max(abs(dx), abs(dy)) / 0.1) + 1
-    step_dx = dx / steps
-    step_dy = dy / steps
+    # Anzahl Substeps je nach größter Achsenbewegung
+    steps    = int(max(abs(dx), abs(dy)) / 0.1) + 1
+    step_dx  = dx / steps
+    step_dy  = dy / steps
 
+    # Horizontal schrittweise
     for _ in range(steps):
-        if not check_wall_collision(ball_x + step_dx, ball_y, radius, grid, CELL_SIZE, WALL_THICKNESS)[0]:
-            ball_x += step_dx
+        test_x = ball_x + step_dx
+        rect, side = check_wall_collision(test_x, ball_y, radius, grid)
+        if rect is None:
+            ball_x = test_x
         else:
+            # flush an die Wandkante schieben
+            ball_x, ball_y = adjust_ball_position(test_x, ball_y, radius, rect, side)
             break
 
+    # Vertikal schrittweise
     for _ in range(steps):
-        if not check_wall_collision(ball_x, ball_y + step_dy, radius, grid, CELL_SIZE, WALL_THICKNESS)[0]:
-            ball_y += step_dy
+        test_y = ball_y + step_dy
+        rect, side = check_wall_collision(ball_x, test_y, radius, grid)
+        if rect is None:
+            ball_y = test_y
         else:
+            ball_x, ball_y = adjust_ball_position(ball_x, test_y, radius, rect, side)
             break
 
     return ball_x, ball_y
+
 
 def draw_trail(trail, screen):
     if len(trail) > 2:
@@ -246,3 +248,5 @@ def determine_ball_color():
         return RED
     else:
         return GREEN
+    
+

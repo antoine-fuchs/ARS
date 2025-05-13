@@ -7,20 +7,35 @@ from Kalman_filter import *
 from Utils import *
 from Config import *
 from Map import *
+from neat.parallel import ParallelEvaluator
+import multiprocessing
+from VisualizeGen import VisualizeReporter
 
-# Initialize Pygame and create window
+# # Initialize Pygame and create window
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("NEAT Maze Simulation")
 
-# Initial map and filters (for manual mode)
-grid = generate_maze()
-kf = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
-ogm = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
+
+
+def init_pygame_if_needed(render):
+    global screen
+    if render and screen is None:
+        pygame.init()
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("NEAT Maze Simulation")
 
 
 def main():
+    
     global ball_x, ball_y, ball_angle
+
+    init_pygame_if_needed(render=True)
+
+    # 2) Dann erst Karte & Filter anlegen
+    grid = generate_maze()
+    kf   = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+    ogm  = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
 
     # Starting position
     ball_x, ball_y, ball_angle = start_x, start_y, 0
@@ -108,21 +123,26 @@ def eval_genomes(genomes, config):
         # No rendering during training for faster evaluations
         fitness = run_simulation(net, render=False)
         genome.fitness = fitness
+        return fitness
+    
+def eval_genome(genome, config):
+    net = neat.nn.FeedForwardNetwork.create(genome, config)
+    return run_simulation(net, render=False)
 
 
 
 def run_simulation(net, render=False):
-    """
-    Runs a complete simulation episode using the given feed-forward network.
-    If render=True, the simulation is visualized in a Pygame window.
-    """
-    # Create a new maze, occupancy grid map, and Kalman filter for each genome
-    grid = generate_maze()
+    init_pygame_if_needed(render)
+    max_steps = 100
+
+    # Karte & Filter für den Simulationslauf
+    grid    = generate_maze()
     ogm_sim = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
-    kf_sim = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+    kf_sim  = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+
 
     # Initial conditions
-    ball_x, ball_y, ball_angle = start_x, start_y, 0
+    ball_x, ball_y, ball_angle,left_wheel_speed,right_wheel_speed = start_x, start_y, 0,0,0
     target_x, target_y = place_target_randomly(
         grid, start_x, start_y, ball_radius, CELL_SIZE, WALL_THICKNESS
     )
@@ -130,7 +150,7 @@ def run_simulation(net, render=False):
     clock = pygame.time.Clock()
     trail = []
 
-    for step in range(100):
+    for step in range(max_steps):
         # Pump Pygame events even without rendering to keep it responsive
         pygame.event.pump()
 
@@ -148,8 +168,9 @@ def run_simulation(net, render=False):
         )
         # Normalize sensor inputs
         max_dist = math.hypot(WIDTH, HEIGHT)
-        inputs = [min(d / max_dist, 1.0) for d in distances[:4]]
+        inputs = [min(d / max_dist, 1.0) for d in distances[:12]]
 
+  
         # Activate the network
         outputs = net.activate(inputs)
         left_speed = outputs[0] * wheel_max_speed
@@ -159,25 +180,27 @@ def run_simulation(net, render=False):
         v = (left_speed + right_speed) / 2
         omega = (right_speed - left_speed) / wheel_base
         ball_angle += omega
+
+
+
+        prev_x, prev_y = ball_x, ball_y
         ball_x, ball_y = update_robot_position(
             ball_x, ball_y, ball_angle, v, omega,
             ball_radius, grid, CELL_SIZE, WALL_THICKNESS
         )
+        # Update and draw occupancy grid map, get exploration reward
+        exploration_reward = ogm_sim.update(ball_x, ball_y, sensor_angles, distances, ball_radius)
 
-        # Check for collision with walls
-        if check_wall_collision(ball_x, ball_y, ball_radius, grid, CELL_SIZE, WALL_THICKNESS):
-            score -= 5
+        #score += exploration_reward*30
 
-        # Check if target reached
-        if circle_circle_collision(
-            ball_x, ball_y, ball_radius,
-            target_x, target_y, ball_radius
-        ):
-            score += 500
-            break
+        rect, side = check_wall_collision(ball_x, ball_y, ball_radius, grid)
+        if rect:
+            score -= 2  # Penalty for hitting a wall
+            ball_x, ball_y = adjust_ball_position(
+                ball_x, ball_y, ball_radius, rect, side
+            )
 
-        # Increment score and record trail
-        score += 1
+        # Increment score for surviving a step
         trail.append((int(ball_x), int(ball_y)))
 
         if render:
@@ -199,31 +222,22 @@ def run_simulation(net, render=False):
                 screen, font_sensors
             )
 
-            # Update and draw occupancy grid map
-            ogm_sim.update(ball_x, ball_y, sensor_angles, distances, ball_radius)
+            # Draw occupancy grid overlay
             ogm_sim.draw(screen)
 
             pygame.display.flip()
             clock.tick(30)
 
     # Apply distance-to-target penalty
-    remaining_distance = math.hypot(ball_x - target_x, ball_y - target_y)
-    score -= remaining_distance
+    #remaining_distance = math.hypot(ball_x - target_x, ball_y - target_y)
+    #score -= remaining_distance
+    distance_from_start = math.hypot(ball_x - start_x, ball_y - start_y)
+    # Optional: skaliere den Reward über einen Faktor
+    DISTANCE_REWARD_FACTOR = 1.0
+    score += distance_from_start * DISTANCE_REWARD_FACTOR
 
     return score
 
-
-class VisualizeReporter(neat.reporting.BaseReporter):
-    def start_generation(self, generation):
-        # Remember which generation is currently running
-        self.generation = generation
-
-    def post_evaluate(self, config, population, species, best_genome):
-        # Visualize the best genome of each generation
-        print(f"\n=== Visualization after Generation {self.generation} ===")
-        net = neat.nn.FeedForwardNetwork.create(best_genome, config)
-        run_simulation(net, render=True)
-        # After closing the window, the process continues automatically
 
 
 if __name__ == "__main__":
@@ -241,18 +255,21 @@ if __name__ == "__main__":
         )
         p = neat.Population(config)
         p.add_reporter(neat.StdOutReporter(True))
-        stats = neat.StatisticsReporter()
-        p.add_reporter(stats)
+        p.add_reporter(neat.StatisticsReporter())
         p.add_reporter(
             neat.Checkpointer(
                 generation_interval=5,
                 filename_prefix="neat-checkpoint-"
             )
         )
+        # Visualisierung erst hier hinzufügen
         p.add_reporter(VisualizeReporter())
+        import os
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
 
-        # Run evolution (without rendering)
-        winner = p.run(eval_genomes, n=10)
+
+        pe = ParallelEvaluator(multiprocessing.cpu_count(), eval_genome)
+        winner = p.run(pe.evaluate, n=50)
 
         # Save the winning genome
         import pickle

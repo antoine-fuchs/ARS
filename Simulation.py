@@ -1,3 +1,4 @@
+import sys
 import pygame
 import math
 import neat
@@ -35,12 +36,13 @@ def main():
     trail = []
 
     while running:
-        screen.fill(BLACK)
-
+        # Events abfragen, damit das Fenster nicht „einfriert“
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             handle_keyboard_input(event, state)
+
+        screen.fill(BLACK)
 
         # Differentialantrieb berechnen
         v = (state['right_speed'] + state['left_speed']) / 2
@@ -93,6 +95,7 @@ def main():
         clock.tick(30)
 
     pygame.quit()
+    sys.exit()
 
 
 def eval_genomes(genomes, config):
@@ -101,14 +104,14 @@ def eval_genomes(genomes, config):
     """
     for genome_id, genome in genomes:
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        fitness = run_simulation(net, render=True)  # render=False (kein Live-Rendering im Training)
+        # Kein Rendering während des Trainings!
+        fitness = run_simulation(net, render=False)
         genome.fitness = fitness
 
 
 def run_simulation(net, render=False):
     """
     Führt eine komplette Simulationsepisode mit dem gegebenen Feed-Forward-Netzwerk durch.
-    Die Fitness setzt sich zusammen aus überlebten Schritten, Bonus fürs Erreichen und Abzug für Restdistanz zum Ziel.
     Wenn render=True, wird die Simulation in einem Pygame-Fenster visualisiert.
     """
     # Neue Karte, Filter und OGM für jedes Genome
@@ -126,6 +129,16 @@ def run_simulation(net, render=False):
     trail = []
 
     for step in range(100):
+        # Auch ohne Rendern die Events pumpen, damit Pygame nicht hängen bleibt
+        pygame.event.pump()
+
+        if render:
+            # Event-Loop, damit Fenster reagiert
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
         # Sensoren messen
         lens = calculate_sensor_object_distances(
             ball_x, ball_y, ball_radius,
@@ -151,7 +164,6 @@ def run_simulation(net, render=False):
         # Kollision mit Wand?
         if check_wall_collision(ball_x, ball_y, ball_radius, grid, CELL_SIZE, WALL_THICKNESS):
             score -= 50
-            
 
         # Ziel erreicht?
         if circle_circle_collision(
@@ -177,15 +189,14 @@ def run_simulation(net, render=False):
             draw_robot(ball_x, ball_y, ball_angle, ball_radius, ball_color, screen)
 
             # Sensoren anzeigen
-            sensor_lengths = lens
             draw_sensor_lines(
                 ball_x, ball_y, ball_radius,
-                sensor_angles, sensor_lengths,
+                sensor_angles, lens,
                 screen, font_sensors
             )
 
             # OGM zeichnen
-            ogm_sim.update(ball_x, ball_y, sensor_angles, sensor_lengths, ball_radius)
+            ogm_sim.update(ball_x, ball_y, sensor_angles, lens, ball_radius)
             ogm_sim.draw(screen)
 
             pygame.display.flip()
@@ -196,6 +207,19 @@ def run_simulation(net, render=False):
     score -= remaining_dist
 
     return score
+
+
+class VisualizeReporter(neat.reporting.BaseReporter):
+    def start_generation(self, generation):
+        # Merken, welche Generation gerade läuft
+        self.generation = generation
+
+    def post_evaluate(self, config, population, species, best_genome):
+        # Hier visualisieren wir den besten Genome jeder Generation
+        print(f"\n=== Visualisierung nach Generation {self.generation} ===")
+        net = neat.nn.FeedForwardNetwork.create(best_genome, config)
+        run_simulation(net, render=True)
+        # Nach Schließen des Fensters geht es automatisch weiter
 
 
 if __name__ == "__main__":
@@ -221,9 +245,10 @@ if __name__ == "__main__":
                 filename_prefix="neat-checkpoint-"
             )
         )
+        p.add_reporter(VisualizeReporter())
 
-        # Evolution
-        winner = p.run(eval_genomes, n=50)
+        # Evolution (ohne Rendering)
+        winner = p.run(eval_genomes, n=10)
 
         # Gewinner speichern
         import pickle
@@ -231,9 +256,10 @@ if __name__ == "__main__":
             pickle.dump(winner, f)
         print(f"Beste Fitness: {winner.fitness}")
 
-        # Gewinner simulieren (mit Visualisierung)
+        # Finale Simulation mit Visualisierung
         winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
-        print(winner_net)
+        print("Starte finale Simulation mit Visualisierung")
         run_simulation(winner_net, render=True)
 
         pygame.quit()
+        sys.exit()

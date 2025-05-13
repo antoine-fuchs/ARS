@@ -8,35 +8,36 @@ from Utils import *
 from Config import *
 from Map import *
 
-# Pygame initialisieren und Fenster anlegen
+# Initialize Pygame and create window
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("NEAT-Maze-Simulation")
+pygame.display.set_caption("NEAT Maze Simulation")
 
-# Initiale Karte und Filter (für den manuellen Modus)
+# Initial map and filters (for manual mode)
 grid = generate_maze()
 kf = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
 ogm = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
 
 
 def main():
-    """
-    Manuelle Steuerung der Simulation mit Tastatur.
-    """
     global ball_x, ball_y, ball_angle
 
-    # Anfangsposition
+    # Starting position
     ball_x, ball_y, ball_angle = start_x, start_y, 0
     clock = pygame.time.Clock()
     running = True
+
+    # Place the target at a random location, different from the start
     target_x, target_y = place_target_randomly(
         grid, start_x, start_y, ball_radius, CELL_SIZE, WALL_THICKNESS
     )
+
+    # Control state for wheel speeds and reset flag
     state = {'left_speed': 0, 'right_speed': 0, 'max_speed': wheel_max_speed, 'reset': False}
     trail = []
 
     while running:
-        # Events abfragen, damit das Fenster nicht „einfriert“
+        # Handle events so the window doesn't freeze
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -44,32 +45,34 @@ def main():
 
         screen.fill(BLACK)
 
-        # Differentialantrieb berechnen
+        # Compute differential drive velocities
         v = (state['right_speed'] + state['left_speed']) / 2
         omega = (state['right_speed'] - state['left_speed']) / wheel_base
         ball_angle += omega
 
-        # Roboter bewegen
+        # Move the robot and enforce boundary limits
         ball_x, ball_y = update_robot_position(
             ball_x, ball_y, ball_angle, v, omega,
             ball_radius, grid, CELL_SIZE, WALL_THICKNESS
         )
-        # Begrenzung an den Rändern
         ball_x = max(ball_radius, min(WIDTH - ball_radius, ball_x))
         ball_y = max(ball_radius, min(HEIGHT - ball_radius, ball_y))
 
+        # Record the path for drawing the trail
         trail.append((int(ball_x), int(ball_y)))
 
+        # Update game status and draw all elements\        
         update_game_status(ball_x, ball_y, target_x, target_y)
         draw_maze_elements(grid, screen)
         draw_trail(trail, screen)
         pygame.draw.circle(screen, WHITE, (int(start_x), int(start_y)), ball_radius // 2)
         draw_target(target_x, target_y)
 
+        # Determine and draw the robot with its color
         ball_color = determine_ball_color()
         draw_robot(ball_x, ball_y, ball_angle, ball_radius, ball_color, screen)
 
-        # Sensoren messen und anzeigen
+        # Measure and display sensor readings
         sensor_lengths = calculate_sensor_object_distances(
             ball_x, ball_y, ball_radius,
             grid, sensor_angles, CELL_SIZE, WALL_THICKNESS
@@ -80,14 +83,15 @@ def main():
             screen, font_sensors
         )
 
-        # Kalman-Filter
+        # Kalman filter prediction and correction
         kf.predict(ball_x, ball_y, ball_angle, dt=0.1)
         features = kf.get_observed_features(ball_x, ball_y, ball_angle)
         kf.correct(features)
 
+        # Draw UI texts (e.g., speed info)
         draw_ui_texts(screen, state, ball_x, ball_y)
 
-        # OGM aktualisieren und zeichnen
+        # Update and draw the occupancy grid map
         ogm.update(ball_x, ball_y, sensor_angles, sensor_lengths, ball_radius)
         ogm.draw(screen)
 
@@ -99,27 +103,25 @@ def main():
 
 
 def eval_genomes(genomes, config):
-    """
-    Batch-Evaluierung: Für jedes Genome eine Simulation durchführen und fitness setzen.
-    """
     for genome_id, genome in genomes:
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        # Kein Rendering während des Trainings!
+        # No rendering during training for faster evaluations
         fitness = run_simulation(net, render=False)
         genome.fitness = fitness
 
 
+
 def run_simulation(net, render=False):
     """
-    Führt eine komplette Simulationsepisode mit dem gegebenen Feed-Forward-Netzwerk durch.
-    Wenn render=True, wird die Simulation in einem Pygame-Fenster visualisiert.
+    Runs a complete simulation episode using the given feed-forward network.
+    If render=True, the simulation is visualized in a Pygame window.
     """
-    # Neue Karte, Filter und OGM für jedes Genome
+    # Create a new maze, occupancy grid map, and Kalman filter for each genome
     grid = generate_maze()
     ogm_sim = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
     kf_sim = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
 
-    # Startbedingungen
+    # Initial conditions
     ball_x, ball_y, ball_angle = start_x, start_y, 0
     target_x, target_y = place_target_randomly(
         grid, start_x, start_y, ball_radius, CELL_SIZE, WALL_THICKNESS
@@ -129,30 +131,31 @@ def run_simulation(net, render=False):
     trail = []
 
     for step in range(100):
-        # Auch ohne Rendern die Events pumpen, damit Pygame nicht hängen bleibt
+        # Pump Pygame events even without rendering to keep it responsive
         pygame.event.pump()
 
         if render:
-            # Event-Loop, damit Fenster reagiert
+            # Handle events to keep the window responsive
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
 
-        # Sensoren messen
-        lens = calculate_sensor_object_distances(
+        # Sensors measure distances to objects
+        distances = calculate_sensor_object_distances(
             ball_x, ball_y, ball_radius,
             grid, sensor_angles, CELL_SIZE, WALL_THICKNESS
         )
-        # Normalisieren
+        # Normalize sensor inputs
         max_dist = math.hypot(WIDTH, HEIGHT)
-        inputs = [min(d / max_dist, 1.0) for d in lens[:4]]
+        inputs = [min(d / max_dist, 1.0) for d in distances[:4]]
 
-        # Netz aktivieren
-        out = net.activate(inputs)
-        left_speed, right_speed = out[0] * wheel_max_speed, out[1] * wheel_max_speed
+        # Activate the network
+        outputs = net.activate(inputs)
+        left_speed = outputs[0] * wheel_max_speed
+        right_speed = outputs[1] * wheel_max_speed
 
-        # Bewegung berechnen und anwenden
+        # Compute and apply motion
         v = (left_speed + right_speed) / 2
         omega = (right_speed - left_speed) / wheel_base
         ball_angle += omega
@@ -161,11 +164,11 @@ def run_simulation(net, render=False):
             ball_radius, grid, CELL_SIZE, WALL_THICKNESS
         )
 
-        # Kollision mit Wand?
+        # Check for collision with walls
         if check_wall_collision(ball_x, ball_y, ball_radius, grid, CELL_SIZE, WALL_THICKNESS):
-            score -= 50
+            score -= 5
 
-        # Ziel erreicht?
+        # Check if target reached
         if circle_circle_collision(
             ball_x, ball_y, ball_radius,
             target_x, target_y, ball_radius
@@ -173,11 +176,12 @@ def run_simulation(net, render=False):
             score += 500
             break
 
+        # Increment score and record trail
         score += 1
         trail.append((int(ball_x), int(ball_y)))
 
         if render:
-            # Darstellung
+            # Rendering
             screen.fill(BLACK)
             update_game_status(ball_x, ball_y, target_x, target_y)
             draw_maze_elements(grid, screen)
@@ -188,46 +192,46 @@ def run_simulation(net, render=False):
             ball_color = determine_ball_color()
             draw_robot(ball_x, ball_y, ball_angle, ball_radius, ball_color, screen)
 
-            # Sensoren anzeigen
+            # Display sensors
             draw_sensor_lines(
                 ball_x, ball_y, ball_radius,
-                sensor_angles, lens,
+                sensor_angles, distances,
                 screen, font_sensors
             )
 
-            # OGM zeichnen
-            ogm_sim.update(ball_x, ball_y, sensor_angles, lens, ball_radius)
+            # Update and draw occupancy grid map
+            ogm_sim.update(ball_x, ball_y, sensor_angles, distances, ball_radius)
             ogm_sim.draw(screen)
 
             pygame.display.flip()
             clock.tick(30)
 
-    # Distanz zum Ziel als Penalty
-    remaining_dist = math.hypot(ball_x - target_x, ball_y - target_y)
-    score -= remaining_dist
+    # Apply distance-to-target penalty
+    remaining_distance = math.hypot(ball_x - target_x, ball_y - target_y)
+    score -= remaining_distance
 
     return score
 
 
 class VisualizeReporter(neat.reporting.BaseReporter):
     def start_generation(self, generation):
-        # Merken, welche Generation gerade läuft
+        # Remember which generation is currently running
         self.generation = generation
 
     def post_evaluate(self, config, population, species, best_genome):
-        # Hier visualisieren wir den besten Genome jeder Generation
-        print(f"\n=== Visualisierung nach Generation {self.generation} ===")
+        # Visualize the best genome of each generation
+        print(f"\n=== Visualization after Generation {self.generation} ===")
         net = neat.nn.FeedForwardNetwork.create(best_genome, config)
         run_simulation(net, render=True)
-        # Nach Schließen des Fensters geht es automatisch weiter
+        # After closing the window, the process continues automatically
 
 
 if __name__ == "__main__":
-    mode = input("Modus wählen: [1] Manuell, [2] NEAT-Training: ")
+    mode = input("Select mode: [1] Manual, [2] NEAT Training: ")
     if mode.strip() == '1':
         main()
     else:
-        # NEAT-Konfiguration laden
+        # Load NEAT configuration
         config = neat.Config(
             neat.DefaultGenome,
             neat.DefaultReproduction,
@@ -247,18 +251,18 @@ if __name__ == "__main__":
         )
         p.add_reporter(VisualizeReporter())
 
-        # Evolution (ohne Rendering)
+        # Run evolution (without rendering)
         winner = p.run(eval_genomes, n=10)
 
-        # Gewinner speichern
+        # Save the winning genome
         import pickle
         with open("best_genome.pkl", "wb") as f:
             pickle.dump(winner, f)
-        print(f"Beste Fitness: {winner.fitness}")
+        print(f"Best Fitness: {winner.fitness}")
 
-        # Finale Simulation mit Visualisierung
+        # Final simulation with visualization
         winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
-        print("Starte finale Simulation mit Visualisierung")
+        print("Starting final simulation with visualization")
         run_simulation(winner_net, render=True)
 
         pygame.quit()

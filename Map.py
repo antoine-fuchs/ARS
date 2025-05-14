@@ -39,6 +39,7 @@ class OccupancyGridMap:
         return i, j
 
     def update(self, robot_x, robot_y, sensor_angles, sensor_distances, ball_radius):
+        #updates the log-odds map with current sensor readings & returns an exploration reward (which indicates the number of mewly discovered walls)
         self.current_walls.clear()
         for angle, dist in zip(sensor_angles, sensor_distances):
             # skip no-detection (>= max_range)
@@ -71,7 +72,7 @@ class OccupancyGridMap:
             elif wall_type == 'right' and cell.walls[1]:
                 self.log_v[i_cell, j_cell + 1] += self.l_occ
                 self.current_walls.append(('v', i_cell, j_cell + 1))
-        # clamp log-odds arrays
+        # clamp log-odds arrays to prevent values from going to extremes
         np.clip(self.log_h, -5.0, 5.0, out=self.log_h)
         np.clip(self.log_v, -5.0, 5.0, out=self.log_v)
         # compute exploration reward
@@ -83,6 +84,8 @@ class OccupancyGridMap:
         self._draw_persistent()
         return exploration_reward
 
+
+    # Ensure everything is visualized in the simulation
     def _draw_persistent(self):
         self.persist_surf.fill((0, 0, 0, 0))
         # draw horizontal edges

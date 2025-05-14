@@ -38,7 +38,7 @@ def main():
     ogm  = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
 
     # Starting position
-    ball_x, ball_y, ball_angle = start_x, start_y, 0
+    ball_x, ball_y, ball_angle,right_wheel_speed,left_wheel_speed = start_x, start_y, 0,0,0
     clock = pygame.time.Clock()
     running = True
 
@@ -133,12 +133,14 @@ def eval_genome(genome, config):
 
 def run_simulation(net, render=False):
     init_pygame_if_needed(render)
-    max_steps = 100
+    max_steps = 300
 
     # Karte & Filter für den Simulationslauf
     grid    = generate_maze()
     ogm_sim = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
     kf_sim  = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+
+    est_x, est_y, est_theta = kf_sim.state.flatten()
 
 
     # Initial conditions
@@ -170,15 +172,26 @@ def run_simulation(net, render=False):
         max_dist = math.hypot(WIDTH, HEIGHT)
         inputs = [min(d / max_dist, 1.0) for d in distances[:12]]
 
+        inputs.extend([
+            left_wheel_speed  / wheel_max_speed,
+            right_wheel_speed / wheel_max_speed
+        ])
+
+        inputs.extend([
+            est_x / WIDTH,
+            est_y / HEIGHT
+        ])
+
+
   
         # Activate the network
         outputs = net.activate(inputs)
-        left_speed = outputs[0] * wheel_max_speed
-        right_speed = outputs[1] * wheel_max_speed
+        left_wheel_speed  = outputs[0] * wheel_max_speed
+        right_wheel_speed = outputs[1] * wheel_max_speed
 
         # Compute and apply motion
-        v = (left_speed + right_speed) / 2
-        omega = (right_speed - left_speed) / wheel_base
+        v = (left_wheel_speed + right_wheel_speed) / 2
+        omega = (right_wheel_speed - left_wheel_speed) / wheel_base
         ball_angle += omega
 
 

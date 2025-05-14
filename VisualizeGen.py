@@ -31,8 +31,13 @@ class VisualizeReporter(neat.reporting.BaseReporter):
     def _run_visualization(self, net):
         max_steps = 200
         grid = generate_maze()
+
+        vis_kf= KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+        est_x, est_y, est_theta = vis_kf.state.flatten()
+
         # Starte wirklich an den globalen Startkoordinaten
         ball_x, ball_y, ball_angle = start_x, start_y, 0
+        left_wheel_speed, right_wheel_speed = 0.0, 0.0
         target_x, target_y = place_target_randomly(
             grid, ball_x, ball_y, ball_radius, CELL_SIZE, WALL_THICKNESS
         )
@@ -49,13 +54,23 @@ class VisualizeReporter(neat.reporting.BaseReporter):
                 grid, sensor_angles, CELL_SIZE, WALL_THICKNESS
             )
             inputs = [d / math.hypot(WIDTH, HEIGHT) for d in distances]
+
+            inputs.extend([
+                left_wheel_speed  / wheel_max_speed,
+                right_wheel_speed / wheel_max_speed
+            ])
+
+            inputs.extend([
+                est_x / WIDTH,
+                est_y / HEIGHT
+            ])
             outputs = net.activate(inputs)
-            left_speed  = outputs[0] * wheel_max_speed
-            right_speed = outputs[1] * wheel_max_speed
+            left_wheel_speed  = outputs[0] * wheel_max_speed
+            right_wheel_speed = outputs[1] * wheel_max_speed
 
             # Bewegung
-            v     = (left_speed + right_speed) / 2
-            omega = (right_speed - left_speed) / wheel_base
+            v     = (left_wheel_speed + right_wheel_speed) / 2
+            omega = (right_wheel_speed - left_wheel_speed) / wheel_base
             ball_angle += omega
 
             # Sub-Stepping + Kollision

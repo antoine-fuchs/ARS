@@ -2,7 +2,7 @@ import pygame
 import math
 import neat
 from Maze import *
-from Kalman_filter import *
+from KalmanFilter import *
 from Utils import *
 from Config import *
 from Map import *

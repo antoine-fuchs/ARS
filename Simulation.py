@@ -3,13 +3,14 @@ import pygame
 import math
 import neat
 from Maze import *
-from Kalman_filter import *
+from KalmanFilter import *
 from Utils import *
 from Config import *
 from Map import *
 from neat.parallel import ParallelEvaluator
 import multiprocessing
 from VisualizeGen import VisualizeReporter
+
 
 # # Initialize Pygame and create window
 pygame.init()
@@ -32,9 +33,8 @@ def main():
 
     init_pygame_if_needed(render=True)
 
-    # 2) Dann erst Karte & Filter anlegen
     grid = generate_maze()
-    kf   = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+    kf   = KalmanFilter(initial_state=[start_x, start_y, 0], grid=grid, screen=screen)
     ogm  = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
 
     # Starting position
@@ -98,10 +98,14 @@ def main():
             screen, font_sensors
         )
 
+
+
         # Kalman filter prediction and correction
-        kf.predict(ball_x, ball_y, ball_angle, dt=0.1)
+        kf.predict(v, omega, dt = 1)  # dt = 1/Frame (30 Hz)
         features = kf.get_observed_features(ball_x, ball_y, ball_angle)
-        kf.correct(features)
+        for feat in features:
+            lm_pos = kf.landmark_map[feat['id']]
+            kf.correct(feat['measurement'], lm_pos)
 
         # Draw UI texts (e.g., speed info)
         draw_ui_texts(screen, state, ball_x, ball_y)
@@ -111,7 +115,7 @@ def main():
         ogm.draw(screen)
 
         pygame.display.flip()
-        clock.tick(30)
+        clock.tick(40)
 
     pygame.quit()
     sys.exit()
@@ -292,7 +296,7 @@ if __name__ == "__main__":
 
         # Save the winning genome
         import pickle
-        with open("best_genome.pkl", "wb") as f:
+        with open("checkpionts/best_genome.pkl", "wb") as f:
             pickle.dump(winner, f)
         print(f"Best Fitness: {winner.fitness}")
 

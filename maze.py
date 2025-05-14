@@ -12,7 +12,7 @@ class Cell:
         self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
         self.visited = False
         self.cell_id = cell_id
-        self.marker = random.random() < 0.5  # 50% chance to have a landmark
+        self.marker = random.random() < 0.3  # 50% chance to have a landmark
     
     def draw(self, screen):
         if self.walls[0]:  # Top wall

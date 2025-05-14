@@ -107,27 +107,27 @@ def handle_keyboard_input(event, state):
 
 def update_robot_position(ball_x, ball_y, ball_angle, v, omega,
                           radius, grid, CELL_SIZE, WALL_THICKNESS):
-    # Gesamtbewegung
+
     dx = v * math.cos(ball_angle)
     dy = v * math.sin(ball_angle)
 
-    # Anzahl Substeps je nach größter Achsenbewegung
+
     steps    = int(max(abs(dx), abs(dy)) / 0.1) + 1
     step_dx  = dx / steps
     step_dy  = dy / steps
 
-    # Horizontal schrittweise
+
     for _ in range(steps):
         test_x = ball_x + step_dx
         rect, side = check_wall_collision(test_x, ball_y, radius, grid)
         if rect is None:
             ball_x = test_x
         else:
-            # flush an die Wandkante schieben
+
             ball_x, ball_y = adjust_ball_position(test_x, ball_y, radius, rect, side)
             break
 
-    # Vertikal schrittweise
+
     for _ in range(steps):
         test_y = ball_y + step_dy
         rect, side = check_wall_collision(ball_x, test_y, radius, grid)

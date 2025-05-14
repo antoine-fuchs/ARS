@@ -5,8 +5,8 @@ from Config import *
 # Cell class
 class Cell:
     def __init__(self, i, j, cell_id):
-        self.i = i  # column index
-        self.j = j  # row index
+        self.i = i  
+        self.j = j 
         self.x = i * CELL_SIZE  # pixel x-position
         self.y = j * CELL_SIZE  # pixel y-position
         self.walls = [True, True, True, True]  # Top, Right, Bottom, Left
@@ -23,8 +23,6 @@ class Cell:
             pygame.draw.line(screen, WHITE, (self.x + CELL_SIZE, self.y + CELL_SIZE), (self.x, self.y + CELL_SIZE), 2)
         if self.walls[3]:  # Left wall
             pygame.draw.line(screen, WHITE, (self.x, self.y + CELL_SIZE), (self.x, self.y), 2)
-
-
 
     def check_neighbors(self, grid):
         neighbors = []

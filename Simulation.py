@@ -133,7 +133,7 @@ def eval_genome(genome, config):
 
 def run_simulation(net, render=False):
     init_pygame_if_needed(render)
-    max_steps = 300
+    max_steps = 1500
 
     # Karte & Filter für den Simulationslauf
     grid    = generate_maze()
@@ -186,8 +186,10 @@ def run_simulation(net, render=False):
   
         # Activate the network
         outputs = net.activate(inputs)
-        left_wheel_speed  = outputs[0] * wheel_max_speed
-        right_wheel_speed = outputs[1] * wheel_max_speed
+        alpha = 0.2
+        left_wheel_speed  = alpha * (outputs[0]*wheel_max_speed) + (1-alpha)*left_wheel_speed
+        right_wheel_speed = alpha * (outputs[1]*wheel_max_speed) + (1-alpha)*right_wheel_speed
+
 
         # Compute and apply motion
         v = (left_wheel_speed + right_wheel_speed) / 2
@@ -202,9 +204,7 @@ def run_simulation(net, render=False):
             ball_radius, grid, CELL_SIZE, WALL_THICKNESS
         )
         # Update and draw occupancy grid map, get exploration reward
-        exploration_reward = ogm_sim.update(ball_x, ball_y, sensor_angles, distances, ball_radius)
 
-        #score += exploration_reward*30
 
         rect, side = check_wall_collision(ball_x, ball_y, ball_radius, grid)
         if rect:
@@ -241,12 +241,18 @@ def run_simulation(net, render=False):
             pygame.display.flip()
             clock.tick(30)
 
+    exploration_reward = ogm_sim.update(ball_x, ball_y, sensor_angles, distances, ball_radius)
+    print(exploration_reward)
+
+    score += exploration_reward*30
+
     # Apply distance-to-target penalty
     #remaining_distance = math.hypot(ball_x - target_x, ball_y - target_y)
     #score -= remaining_distance
     distance_from_start = math.hypot(ball_x - start_x, ball_y - start_y)
+    print(f"Distance from start: {distance_from_start}")    
     # Optional: skaliere den Reward über einen Faktor
-    DISTANCE_REWARD_FACTOR = 1.0
+    DISTANCE_REWARD_FACTOR = 5
     score += distance_from_start * DISTANCE_REWARD_FACTOR
 
     return score
@@ -272,7 +278,7 @@ if __name__ == "__main__":
         p.add_reporter(
             neat.Checkpointer(
                 generation_interval=5,
-                filename_prefix="neat-checkpoint-"
+                filename_prefix="checkpoints/neat-checkpoint-"
             )
         )
         # Visualisierung erst hier hinzufügen
@@ -282,7 +288,7 @@ if __name__ == "__main__":
 
 
         pe = ParallelEvaluator(multiprocessing.cpu_count(), eval_genome)
-        winner = p.run(pe.evaluate, n=50)
+        winner = p.run(pe.evaluate, n=500)
 
         # Save the winning genome
         import pickle

@@ -39,13 +39,6 @@ class OccupancyGridMap:
         return i, j
 
     def update(self, robot_x, robot_y, sensor_angles, sensor_distances, ball_radius):
-        """
-        Update the log-odds map with current sensor readings,
-        draw new walls, and compute exploration reward.
-
-        Returns:
-            exploration_reward (int): number of newly discovered walls
-        """
         self.current_walls.clear()
         for angle, dist in zip(sensor_angles, sensor_distances):
             # skip no-detection (>= max_range)

@@ -49,6 +49,5 @@ font_sensors = pygame.font.SysFont(None, 12)
 font_hints = pygame.font.SysFont(None, 24)
 font_speed = pygame.font.SysFont(None, 12)
 
-
 BASE_SIMULATION_STEPS      = 10   
 SIMULATION_STEP_INCREMENT  = 10    

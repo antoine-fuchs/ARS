@@ -7,8 +7,6 @@ from Utils import *
 from Config import *
 from Map import *
 
-
-
 class VisualizeReporter(neat.reporting.BaseReporter):
     def __init__(self):
         # 1) Fenster nur einmal öffnen
@@ -17,6 +15,8 @@ class VisualizeReporter(neat.reporting.BaseReporter):
         pygame.display.set_caption("Best of Generation Visualization")
         self.clock = pygame.time.Clock()
         self.generation = None
+        self.left_wheel_speed = 0
+        self.right_wheel_speed = 0
 
     def start_generation(self, generation):
         global current_generation
@@ -37,7 +37,6 @@ class VisualizeReporter(neat.reporting.BaseReporter):
 
         # Starte wirklich an den globalen Startkoordinaten
         ball_x, ball_y, ball_angle = start_x, start_y, 0
-        left_wheel_speed, right_wheel_speed = 0.0, 0.0
         target_x, target_y = place_target_randomly(
             grid, ball_x, ball_y, ball_radius, CELL_SIZE, WALL_THICKNESS
         )
@@ -48,7 +47,6 @@ class VisualizeReporter(neat.reporting.BaseReporter):
                 if event.type == pygame.QUIT:
                     return
 
-            # Sensoren einlesen
             distances = calculate_sensor_object_distances(
                 ball_x, ball_y, ball_radius,
                 grid, sensor_angles, CELL_SIZE, WALL_THICKNESS
@@ -56,8 +54,8 @@ class VisualizeReporter(neat.reporting.BaseReporter):
             inputs = [d / math.hypot(WIDTH, HEIGHT) for d in distances]
 
             inputs.extend([
-                left_wheel_speed  / wheel_max_speed,
-                right_wheel_speed / wheel_max_speed
+                self.left_wheel_speed  / wheel_max_speed,
+                self.right_wheel_speed / wheel_max_speed
             ])
 
             inputs.extend([
@@ -65,12 +63,16 @@ class VisualizeReporter(neat.reporting.BaseReporter):
                 est_y / HEIGHT
             ])
             outputs = net.activate(inputs)
-            left_wheel_speed  = outputs[0] * wheel_max_speed
-            right_wheel_speed = outputs[1] * wheel_max_speed
+            alpha = 0.2
+            self.left_wheel_speed  = alpha * (outputs[0]*wheel_max_speed) + (1-alpha)*self.left_wheel_speed
+            self.right_wheel_speed = alpha * (outputs[1]*wheel_max_speed) + (1-alpha)*self.right_wheel_speed
+
+
+            #print(f"Step {step}: left: {self.left_wheel_speed}, right: {self.right_wheel_speed}")
 
             # Bewegung
-            v     = (left_wheel_speed + right_wheel_speed) / 2
-            omega = (right_wheel_speed - left_wheel_speed) / wheel_base
+            v     = (self.left_wheel_speed + self.right_wheel_speed) / 2
+            omega = (self.right_wheel_speed - self.left_wheel_speed) / wheel_base
             ball_angle += omega
 
             # Sub-Stepping + Kollision
@@ -120,7 +122,6 @@ class VisualizeReporter(neat.reporting.BaseReporter):
 
 
     def __getstate__(self):
-        """Wird von pickle.dump() benutzt. Entferne unpicklbare Objekte."""
         state = self.__dict__.copy()
         # drop unpicklable entries
         state.pop('screen', None)
@@ -128,7 +129,6 @@ class VisualizeReporter(neat.reporting.BaseReporter):
         return state
 
     def __setstate__(self, state):
-        """Wird von pickle.load() aufgerufen. Stelle den Reporter wieder her."""
         self.__dict__.update(state)
         # Fenster/Clock neu anlegen, damit die Visualisierung weiter funktioniert
         pygame.init()

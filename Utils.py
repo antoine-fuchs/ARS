@@ -4,30 +4,12 @@ import random
 from Config import *
 
 
-# Circle-Rectangle collision detection
-def circle_rect_collision(circle_x, circle_y, radius, rect_x, rect_y, rect_width, rect_height):
-    # Calculate the closest point on the rectangle to the circle center
-    closest_x = max(rect_x, min(circle_x, rect_x + rect_width))
-    closest_y = max(rect_y, min(circle_y, rect_y + rect_height))
-    
-    # Calculate the distance between the closest point and the circle center
-    distance_x = circle_x - closest_x
-    distance_y = circle_y - closest_y
-    
-    # Calculate squared distance
-    distance_squared = distance_x * distance_x + distance_y * distance_y
-    
-    # If distance is less than or equal to radius, there is a collisi
-    return distance_squared <= (radius * radius) #dont understand this... returns a boolean i guess? why the radius squared?
-
 # Circle-Circle collision detection
 def circle_circle_collision(x1, y1, r1, x2, y2, r2):
     distance_squared = (x1 - x2) ** 2 + (y1 - y2) ** 2
     return distance_squared <= ((r1 + r2) ** 2)
 
 #should we here put a function that randomly puts obstacles (rectangles/circles) in the maze?
-
-# In deiner Utils- oder Collision-Datei
 
 def check_wall_collision(circle_x, circle_y, r, grid):
     sides = ['top','right','bottom','left']
@@ -42,7 +24,7 @@ def check_wall_collision(circle_x, circle_y, r, grid):
         for idx, rect in enumerate(walls):
             if not cell.walls[idx]:
                 continue
-            # nächster Punkt auf rect
+
             cx = max(rect.x, min(circle_x, rect.x + rect.width))
             cy = max(rect.y, min(circle_y, rect.y + rect.height))
             dx, dy = circle_x - cx, circle_y - cy
@@ -63,13 +45,6 @@ def adjust_ball_position(ball_x, ball_y, r, rect, side):
 
 def cast_sensor(ball_x, ball_y, ball_radius, angle_deg, grid,
                 max_range, step=1):
-    """
-    Schießt einen Sensor-Strahl ab Kugeloberfläche in Richtung `angle_deg`.
-    Gibt die Entfernung von der Kugeloberfläche bis zur Wand zurück.
-    - angle_deg: Winkel in Grad (0° = rechts, 90° = unten, etc.)
-    - max_range: maximale Reichweite des Sensors (ab Kugelmittelpunkt!)
-    - step: Schrittweite in Pixeln
-    """
     angle_rad = math.radians(angle_deg)
     # Wir beginnen bei dist = ball_radius
     for dist in range(int(ball_radius), int(max_range), step):
@@ -87,11 +62,6 @@ def cast_sensor(ball_x, ball_y, ball_radius, angle_deg, grid,
 
 def calculate_sensor_object_distances(ball_x, ball_y, ball_radius, grid,
                                       sensor_angles, max_range, step=1):
-    """
-    Liest für jede Richtung in sensor_angles die Distanz zur nächstliegenden Wand.
-    - sensor_angles: Liste von Winkeln in Grad
-    - max_range: maximale Entfernung vom Kugelmittelpunkt
-    """
     distances = []
     for angle in sensor_angles:
         d = cast_sensor(ball_x, ball_y, ball_radius, angle,
@@ -248,5 +218,3 @@ def determine_ball_color():
         return RED
     else:
         return GREEN
-    
-

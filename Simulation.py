@@ -63,6 +63,10 @@ def main():
                 mutate_maze(grid, changes=5) 
             handle_keyboard_input(event, state)
 
+        timer_interval = 1000 # 0.5 seconds
+        timer_event = pygame.USEREVENT + 1
+        pygame.time.set_timer(timer_event , timer_interval)
+
         screen.fill(BLACK)
 
         # Compute differential drive velocities
@@ -106,11 +110,11 @@ def main():
 
 
         # Kalman filter prediction and correction
-        kf.predict(v, omega, dt = 1)  # dt = 1/Frame (30 Hz)
-        features = kf.get_observed_features(ball_x, ball_y, ball_angle)
-        for feat in features:
-            lm_pos = kf.landmark_map[feat['id']]
-            kf.correct(feat['measurement'], lm_pos)
+        # kf.predict(v, omega, dt = 1)  # dt = 1/Frame (30 Hz)
+        # features = kf.get_observed_features(ball_x, ball_y, ball_angle)
+        # for feat in features:
+        #     lm_pos = kf.landmark_map[feat['id']]
+        #     kf.correct(feat['measurement'], lm_pos)
 
         # Draw UI texts (e.g., speed info)
         draw_ui_texts(screen, state, ball_x, ball_y)
@@ -119,7 +123,7 @@ def main():
 
         # Update and draw the occupancy grid map
         ogm.update(ball_x, ball_y, sensor_angles, sensor_lengths, ball_radius)
-        ogm.draw(screen)
+        #ogm.draw(screen)
 
         pygame.display.flip()
         clock.tick(40)
@@ -127,14 +131,6 @@ def main():
     pygame.quit()
     sys.exit()
 
-
-def eval_genomes(genomes, config):
-    for genome_id, genome in genomes:
-        net = neat.nn.FeedForwardNetwork.create(genome, config)
-        # No rendering during training for faster evaluations
-        fitness = run_simulation(net, render=False)
-        genome.fitness = fitness
-        return fitness
     
 def eval_genome(genome, config):
     net = neat.nn.FeedForwardNetwork.create(genome, config)

@@ -178,7 +178,7 @@ def draw_robot(ball_x, ball_y, angle, radius, color, screen):
 
 def draw_ui_texts(screen, state, ball_x, ball_y):
     # Controls info
-    controls_text = font_hints.render("Controls: W/S (left), O/L (right), R (reset)", True, WHITE)
+    controls_text = font_hints.render("Controls: W/S (left), O/L (right)", True, WHITE)
     screen.blit(controls_text, (10, 10))
 
     # Game status

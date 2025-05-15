@@ -32,7 +32,9 @@ class VisualizeReporter(neat.reporting.BaseReporter):
         max_steps = 200
         grid = generate_maze()
 
-        vis_kf= KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+        vis_ogm  = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
+
+        vis_kf= KalmanFilter(initial_state=[start_x, start_y, 0], grid=grid, screen=screen)
         est_x, est_y, est_theta = vis_kf.state.flatten()
 
         # Starte wirklich an den globalen Startkoordinaten
@@ -105,6 +107,19 @@ class VisualizeReporter(neat.reporting.BaseReporter):
             )
             draw_target(target_x, target_y)
 
+
+            sensor_lengths = calculate_sensor_object_distances(
+                ball_x, ball_y, ball_radius,
+                grid, sensor_angles, CELL_SIZE, WALL_THICKNESS
+            )
+
+
+            # vis_kf.predict(v, omega, dt = 1)  # dt = 1/Frame (30 Hz)
+            # features = vis_kf.get_observed_features(ball_x, ball_y, ball_angle)
+            # for feat in features:
+            #     lm_pos = vis_kf.landmark_map[feat['id']]
+            #     vis_kf.correct(feat['measurement'], lm_pos)
+
             ball_color = determine_ball_color()
             draw_robot(
                 ball_x, ball_y, ball_angle,
@@ -116,6 +131,13 @@ class VisualizeReporter(neat.reporting.BaseReporter):
                 sensor_angles, distances,
                 self.screen, font_sensors
             )
+
+            # # Update and draw the occupancy grid map
+            # vis_ogm.update(ball_x, ball_y, sensor_angles, sensor_lengths, ball_radius)
+            # vis_ogm.draw(screen)
+
+
+
 
             pygame.display.flip()
             self.clock.tick(30)

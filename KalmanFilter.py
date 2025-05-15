@@ -41,7 +41,6 @@ class KalmanFilter:
         u = np.array([[v], [omega]])
         self.state = self.state + B @ u
 
-        print(f"State: {self.state.flatten()}")
 
         self.covariance = self.covariance + self.R
 
@@ -56,7 +55,7 @@ class KalmanFilter:
                 self.screen,
                 (255, 0, 0),
                 (x_f, y_f),
-                2
+                1
             )
 
 

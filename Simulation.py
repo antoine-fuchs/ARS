@@ -33,6 +33,9 @@ def main():
 
     init_pygame_if_needed(render=True)
 
+    MUTATE_EVENT = pygame.USEREVENT + 1
+    pygame.time.set_timer(MUTATE_EVENT, 2000)
+
     grid = generate_maze()
     kf   = KalmanFilter(initial_state=[start_x, start_y, 0], grid=grid, screen=screen)
     ogm  = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
@@ -56,6 +59,8 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == MUTATE_EVENT:
+                mutate_maze(grid, changes=5) 
             handle_keyboard_input(event, state)
 
         screen.fill(BLACK)
@@ -110,6 +115,8 @@ def main():
         # Draw UI texts (e.g., speed info)
         draw_ui_texts(screen, state, ball_x, ball_y)
 
+        
+
         # Update and draw the occupancy grid map
         ogm.update(ball_x, ball_y, sensor_angles, sensor_lengths, ball_radius)
         ogm.draw(screen)
@@ -137,12 +144,12 @@ def eval_genome(genome, config):
 
 def run_simulation(net, render=False):
     init_pygame_if_needed(render)
-    max_steps = 1500
+    max_steps = 200
 
     # Karte & Filter für den Simulationslauf
     grid    = generate_maze()
     ogm_sim = OccupancyGridMap(rows=ROWS, cols=COLS, grid=grid)
-    kf_sim  = KalmanFilter(initial_state=[1, 1, 1], grid=grid, screen=screen)
+    kf_sim  = KalmanFilter(initial_state=[start_x, start_y, 0], grid=grid, screen=screen)
 
     est_x, est_y, est_theta = kf_sim.state.flatten()
 
@@ -217,33 +224,9 @@ def run_simulation(net, render=False):
                 ball_x, ball_y, ball_radius, rect, side
             )
 
-        # Increment score for surviving a step
+
         trail.append((int(ball_x), int(ball_y)))
 
-        if render:
-            # Rendering
-            screen.fill(BLACK)
-            update_game_status(ball_x, ball_y, target_x, target_y)
-            draw_maze_elements(grid, screen)
-            draw_trail(trail, screen)
-            pygame.draw.circle(screen, WHITE, (int(start_x), int(start_y)), ball_radius // 2)
-            draw_target(target_x, target_y)
-
-            ball_color = determine_ball_color()
-            draw_robot(ball_x, ball_y, ball_angle, ball_radius, ball_color, screen)
-
-            # Display sensors
-            draw_sensor_lines(
-                ball_x, ball_y, ball_radius,
-                sensor_angles, distances,
-                screen, font_sensors
-            )
-
-            # Draw occupancy grid overlay
-            ogm_sim.draw(screen)
-
-            pygame.display.flip()
-            clock.tick(30)
 
     exploration_reward = ogm_sim.update(ball_x, ball_y, sensor_angles, distances, ball_radius)
     print(exploration_reward)

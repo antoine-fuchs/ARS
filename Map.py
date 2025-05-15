@@ -23,6 +23,7 @@ class OccupancyGridMap:
         self.log_v = np.zeros((self.rows, self.cols + 1), dtype=float)
         # Inverse sensor model occupancy weight
         self.l_occ = math.log(0.9 / 0.1)
+        self.l_free = math.log(0.3 / 0.7)
         # Persistent surface for drawing mapped walls
         width_px = self.cols * cell_size
         height_px = self.rows * cell_size
@@ -41,39 +42,58 @@ class OccupancyGridMap:
     def update(self, robot_x, robot_y, sensor_angles, sensor_distances, ball_radius):
         self.current_walls.clear()
         for angle, dist in zip(sensor_angles, sensor_distances):
-            # skip no-detection (>= max_range)
             if dist >= self.max_range:
                 continue
-            # compute beam endpoint
+
+            # Strahl-Endpunkt
             rad = math.radians(angle)
             ex = robot_x + dist * math.cos(rad)
             ey = robot_y + dist * math.sin(rad)
-            # check which wall was hit
-            collision, wall_type = check_wall_collision(
-                ex, ey, ball_radius, self.grid
-            )
+
+            i_hit, j_hit = self.world_to_grid(ex, ey)
+
+            # 1) free-space updates: unterteile den Strahl in N Schritte
+            num_steps = int(dist / (self.cell_size * 0.5))
+            for step in range(num_steps):
+                t = (step + 0.5) / num_steps
+                ix = robot_x + t * (ex - robot_x)
+                iy = robot_y + t * (ey - robot_y)
+                i_cell, j_cell = self.world_to_grid(ix, iy)
+                if (i_cell, j_cell) == (i_hit, j_hit):
+                    continue 
+
+                # Horizontal oben/unten
+                self.log_h[i_cell    , j_cell] += self.l_free
+                self.log_h[i_cell + 1, j_cell] += self.l_free
+                # Vertikal links/rechts
+                self.log_v[i_cell, j_cell    ] += self.l_free
+                self.log_v[i_cell, j_cell + 1] += self.l_free
+
+            # 2) collision check & occupied update
+            collision, wall_type = check_wall_collision(ex, ey, ball_radius, self.grid)
             if not collision:
                 continue
-            # convert endpoint to grid cell indices
+
             i_cell, j_cell = self.world_to_grid(ex, ey)
-            idx = j_cell + i_cell * self.cols
-            cell = self.grid[idx]
-            # update log-odds for the hit wall if it exists
-            if wall_type == 'top' and cell.walls[0]:
-                self.log_h[i_cell, j_cell] += self.l_occ
+            if wall_type == 'top'    and self.grid[i_cell*self.cols + j_cell].walls[0]:
+                self.log_h[i_cell, j_cell]     += self.l_occ
                 self.current_walls.append(('h', i_cell, j_cell))
-            elif wall_type == 'bottom' and cell.walls[2]:
+            elif wall_type == 'bottom' and self.grid[i_cell*self.cols + j_cell].walls[2]:
                 self.log_h[i_cell + 1, j_cell] += self.l_occ
                 self.current_walls.append(('h', i_cell + 1, j_cell))
-            elif wall_type == 'left' and cell.walls[3]:
-                self.log_v[i_cell, j_cell] += self.l_occ
+            elif wall_type == 'left'   and self.grid[i_cell*self.cols + j_cell].walls[3]:
+                self.log_v[i_cell, j_cell]     += self.l_occ
                 self.current_walls.append(('v', i_cell, j_cell))
-            elif wall_type == 'right' and cell.walls[1]:
+            elif wall_type == 'right'  and self.grid[i_cell*self.cols + j_cell].walls[1]:
                 self.log_v[i_cell, j_cell + 1] += self.l_occ
                 self.current_walls.append(('v', i_cell, j_cell + 1))
-        # clamp log-odds arrays
+
+        # clamp Log-Odds wie gehabt
         np.clip(self.log_h, -5.0, 5.0, out=self.log_h)
         np.clip(self.log_v, -5.0, 5.0, out=self.log_v)
+
+
+
         # compute exploration reward
         new_walls = set(self.current_walls) - self.discovered_walls
         exploration_reward = len(new_walls)

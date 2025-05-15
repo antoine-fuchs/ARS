@@ -54,6 +54,10 @@ def main():
     state = {'left_speed': 0, 'right_speed': 0, 'max_speed': wheel_max_speed, 'reset': False}
     trail = []
 
+    #For rescue timer
+    TOTAL_TIME = 180  # seconds
+    start_time = pygame.time.get_ticks()
+
     while running:
         # Handle events so the window doesn't freeze
         for event in pygame.event.get():
@@ -124,8 +128,18 @@ def main():
         pygame.display.flip()
         clock.tick(40)
 
+        #Make the timer countdown
+        now = pygame.time.get_ticks()
+        remaining = TOTAL_TIME - (now - start_time) / 1000
+        if remaining <= 0:
+            print("Time's up!")
+            running = False
+        else:
+            print(f"Remaining time: {remaining:.1f} seconds")
+
     pygame.quit()
     sys.exit()
+
 
 
 def eval_genomes(genomes, config):
@@ -194,10 +208,9 @@ def run_simulation(net, render=False):
         ])
 
 
-  
         # Activate the network
         outputs = net.activate(inputs)
-        alpha = 0.2
+        alpha = 0.2 #for smoothing out the wheel speeds
         left_wheel_speed  = alpha * (outputs[0]*wheel_max_speed) + (1-alpha)*left_wheel_speed
         right_wheel_speed = alpha * (outputs[1]*wheel_max_speed) + (1-alpha)*right_wheel_speed
 
